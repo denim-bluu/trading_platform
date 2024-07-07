@@ -40,11 +40,19 @@ To build the Aggregator Service, navigate to the service's root directory and ru
 ```sh
 docker-compose up
 ```
+
 ## Strategy Service
+
 wip...
+
 ## Platform Service
+
 wip...
+
 ## Backtesting Service
+
 wip...
+
 ## Trading Service
+
 wip...
