@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package data;
+
+option go_package = "github.com/migojipsa/aggregator/proto/data";
+
+message DataPoint {
+    string symbol = 1;
+    string timestamp = 2;
+    double open = 3;
+    double high = 4;
+    double low = 5;
+    double close = 6;
+    double adjclose = 7;
+    double volume = 8;
+    map<string, double> indicators = 9;
+}
+
+message HistoricalData {
+    repeated DataPoint data_points = 1;
+}
