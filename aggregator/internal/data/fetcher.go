@@ -28,11 +28,12 @@ type yahooResponse struct {
 			Timestamp  []int64 `json:"timestamp"`
 			Indicators struct {
 				Quote []struct {
-					Open   []float64 `json:"open"`
-					High   []float64 `json:"high"`
-					Low    []float64 `json:"low"`
-					Close  []float64 `json:"close"`
-					Volume []float64 `json:"volume"`
+					Open     []float64 `json:"open"`
+					High     []float64 `json:"high"`
+					Low      []float64 `json:"low"`
+					Close    []float64 `json:"close"`
+					Adjclose []float64 `json:"adjclose"`
+					Volume   []float64 `json:"volume"`
 				} `json:"quote"`
 			} `json:"indicators"`
 		} `json:"result"`
@@ -68,7 +69,7 @@ func (yf *YahooFinanceFetcher) FetchHistoricalData(symbol string, startDate stri
 			High:      quotes.High[i],
 			Low:       quotes.Low[i],
 			Close:     quotes.Close[i],
-			Adjclose:  quotes.Close[i],
+			Adjclose:  quotes.Adjclose[i],
 			Volume:    quotes.Volume[i],
 		}
 	}
@@ -102,6 +103,7 @@ func (yf *YahooFinanceFetcher) FetchLiveData(symbol string) (*pb.DataPoint, erro
 		High:      quotes.High[latestIndex],
 		Low:       quotes.Low[latestIndex],
 		Close:     quotes.Close[latestIndex],
+		Adjclose:  quotes.Adjclose[latestIndex],
 		Volume:    quotes.Volume[latestIndex],
 	}
 

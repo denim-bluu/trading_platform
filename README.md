@@ -41,8 +41,26 @@ To build the Aggregator Service, navigate to the service's root directory and ru
 docker-compose up
 ```
 
-#### Example Requests:
+OR
+
+##### Aggregator
+
+```bash
+docker build -t aggregator -f aggregator/Dockerfile .
+docker run -p 8080:8080 aggregator
+```
+
+##### Strategy
+
+```bash
+docker build -t strategy -f strategy/Dockerfile . 
+docker run -p 8081:8081 strategy
+```
+
+#### Example Requests
+
 - Aggregate & Loading the historical data to local protobuf file:
+
 ```bash
 curl -X POST http://localhost:8080/aggregate_historical_data -d '{
   "symbol": "AAPL",
@@ -51,14 +69,16 @@ curl -X POST http://localhost:8080/aggregate_historical_data -d '{
   "end_date": "2024-06-30"
 }' -H "Content-Type: application/json"
 ```
+
 - Getting the historical data from local protobuf file:
+
 ```bash
 curl -X POST http://localhost:8080/get_historical_data -d '{      
   "symbol": "AAPL",
   "filename": "historical_data.pb",
   "start_date": "2024-01-01",
   "end_date": "2024-01-31"
-}' -H "Content-Type: application/json
+}' -H "Content-Type: application/json"
 ```
 
 ## Strategy Service

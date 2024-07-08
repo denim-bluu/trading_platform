@@ -2,24 +2,30 @@ package aggregator
 
 import (
 	"log"
+	"os"
+	"path/filepath"
 	"time"
 
 	"trading_platform/aggregator/internal/data"
-	"trading_platform/aggregator/internal/indicators"
 	pb "trading_platform/aggregator/proto"
 )
 
 type Aggregator struct {
-	fetcher    data.DataFetcher
-	calculator indicators.IndicatorCalculator
-	storage    data.DataStorage
+	fetcher data.DataFetcher
+	storage data.DataStorage
+	dataDir string
 }
 
-func NewAggregator(fetcher data.DataFetcher, calculator indicators.IndicatorCalculator, storage data.DataStorage) *Aggregator {
-	return &Aggregator{fetcher: fetcher, calculator: calculator, storage: storage}
+func NewAggregator(fetcher data.DataFetcher, storage data.DataStorage, dataDir string) *Aggregator {
+	os.MkdirAll(dataDir, os.ModePerm) // Ensure the data directory exists
+	return &Aggregator{fetcher: fetcher, storage: storage, dataDir: dataDir}
 }
 
-func (a *Aggregator) AggregateHistoricalData(symbol string, startDate string, endDate string, filename string) error {
+func (a *Aggregator) getFilename(symbol string) string {
+	return filepath.Join(a.dataDir, symbol+".pb")
+}
+
+func (a *Aggregator) AggregateHistoricalData(symbol string, startDate string, endDate string) error {
 	log.Printf("Fetching historical data for symbol: %s", symbol)
 	data, err := a.fetcher.FetchHistoricalData(symbol, startDate, endDate)
 	if err != nil {
@@ -28,11 +34,20 @@ func (a *Aggregator) AggregateHistoricalData(symbol string, startDate string, en
 	}
 	log.Printf("Fetched %d data points for symbol: %s", len(data), symbol)
 
-	a.calculateAndStoreIndicators(data, filename)
+	filename := a.getFilename(symbol)
+	log.Printf("Saving aggregated data to file: %s", filename)
+	protoData := &pb.HistoricalData{DataPoints: data}
+	err = a.storage.SaveData(filename, protoData)
+	if err != nil {
+		log.Printf("Failed to save data: %v", err)
+		return err
+	}
+
+	log.Println("Successfully saved aggregated data")
 	return nil
 }
 
-func (a *Aggregator) UpdateLiveData(symbol string, filename string) error {
+func (a *Aggregator) UpdateLiveData(symbol string) error {
 	log.Printf("Fetching live data for symbol: %s", symbol)
 	liveData, err := a.fetcher.FetchLiveData(symbol)
 	if err != nil {
@@ -40,6 +55,7 @@ func (a *Aggregator) UpdateLiveData(symbol string, filename string) error {
 		return err
 	}
 
+	filename := a.getFilename(symbol)
 	log.Printf("Loading existing data from file: %s", filename)
 	storedData, err := a.storage.LoadData(filename)
 	if err != nil {
@@ -49,11 +65,18 @@ func (a *Aggregator) UpdateLiveData(symbol string, filename string) error {
 
 	log.Println("Updating stored data with live data")
 	storedData.DataPoints = append(storedData.DataPoints, liveData)
-	a.calculateAndStoreIndicators(storedData.DataPoints, filename)
+	err = a.storage.SaveData(filename, storedData)
+	if err != nil {
+		log.Printf("Failed to save updated data: %v", err)
+		return err
+	}
+
+	log.Println("Successfully updated live data")
 	return nil
 }
 
-func (a *Aggregator) GetHistoricalData(symbol string, filename string, startDate string, endDate string) ([]*pb.DataPoint, error) {
+func (a *Aggregator) GetHistoricalData(symbol string, startDate string, endDate string) ([]*pb.DataPoint, error) {
+	filename := a.getFilename(symbol)
 	log.Printf("Loading data from file: %s", filename)
 	storedData, err := a.storage.LoadData(filename)
 	if err != nil {
@@ -94,50 +117,4 @@ func (a *Aggregator) GetHistoricalData(symbol string, filename string, startDate
 
 	log.Printf("Returning %d filtered data points", len(filteredData))
 	return filteredData, nil
-}
-
-func (a *Aggregator) calculateAndStoreIndicators(data []*pb.DataPoint, filename string) {
-	log.Println("Calculating indicators")
-	AdjClosePrices := make([]float64, len(data))
-	highPrices := make([]float64, len(data))
-	lowPrices := make([]float64, len(data))
-	for i, dp := range data {
-		AdjClosePrices[i] = dp.Adjclose
-		highPrices[i] = dp.High
-		lowPrices[i] = dp.Low
-	}
-
-	ma20 := a.calculator.CalculateMovingAverage(AdjClosePrices, 20)
-	ma100 := a.calculator.CalculateMovingAverage(AdjClosePrices, 100)
-	ma200 := a.calculator.CalculateMovingAverage(AdjClosePrices, 200)
-	atr20 := a.calculator.CalculateATR(highPrices, lowPrices, AdjClosePrices, 20)
-
-	for i := range data {
-		if data[i].Indicators == nil {
-			data[i].Indicators = make(map[string]float64)
-		}
-
-		if i >= 19 {
-			data[i].Indicators["MA20"] = ma20[i-19]
-		}
-		if i >= 99 {
-			data[i].Indicators["MA100"] = ma100[i-99]
-		}
-		if i >= 199 {
-			data[i].Indicators["MA200"] = ma200[i-199]
-		}
-		if i >= 19 {
-			data[i].Indicators["ATR20"] = atr20[i-19]
-		}
-	}
-
-	log.Printf("Saving aggregated data to file: %s", filename)
-	protoData := &pb.HistoricalData{DataPoints: data}
-	err := a.storage.SaveData(filename, protoData)
-	if err != nil {
-		log.Printf("Failed to save data: %v", err)
-		return
-	}
-
-	log.Println("Successfully saved aggregated data")
 }

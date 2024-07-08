@@ -13,7 +13,6 @@ import (
 	"trading_platform/aggregator/internal/config"
 	"trading_platform/aggregator/internal/data"
 	"trading_platform/aggregator/internal/handlers"
-	"trading_platform/aggregator/internal/indicators"
 	"trading_platform/aggregator/middleware"
 )
 
@@ -26,10 +25,9 @@ func main() {
 	}
 
 	fetcher := data.NewYahooFinanceFetcher(cfg.YahooFinanceAPIURL)
-	calculator := indicators.NewIndicatorCalculator()
 	storage := data.NewDataStorage()
 
-	agg := aggregator.NewAggregator(fetcher, calculator, storage)
+	agg := aggregator.NewAggregator(fetcher, storage, cfg.DataDir)
 	handler := handlers.NewHandlers(agg)
 
 	mux := http.NewServeMux()

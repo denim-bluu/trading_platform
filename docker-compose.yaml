@@ -11,3 +11,15 @@ services:
       - PORT=8080
     volumes:
       - ./aggregator/data:/app/aggregator/data
+  
+  strategy:
+    build:
+      context: .
+      dockerfile: strategy/Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - AGGREGATOR_URL=http://aggregator:8080
+      - PORT=8081
+    volumes:
+      - ./strategy/data:/app/strategy/data

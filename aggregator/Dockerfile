@@ -17,10 +17,10 @@ COPY . .
 WORKDIR /app/trading_platform/aggregator
 
 # Build the application
-RUN go build -o main ./cmd/main.go
+RUN go build -o aggregator ./cmd/main.go
 
 # Expose port 8080 to the outside world
 EXPOSE 8080
 
 # Command to run the executable
-CMD ["./main"]
+CMD ["./aggregator"]
