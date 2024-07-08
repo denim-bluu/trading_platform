@@ -25,3 +25,4 @@ go.work.sum
 .env
 .vscode
 aggregator/cmd/historical_data.pb
+*.pb
