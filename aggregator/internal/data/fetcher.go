@@ -28,13 +28,15 @@ type yahooResponse struct {
 			Timestamp  []int64 `json:"timestamp"`
 			Indicators struct {
 				Quote []struct {
-					Open     []float64 `json:"open"`
-					High     []float64 `json:"high"`
-					Low      []float64 `json:"low"`
-					Close    []float64 `json:"close"`
-					Adjclose []float64 `json:"adjclose"`
-					Volume   []float64 `json:"volume"`
+					Open   []float64 `json:"open"`
+					High   []float64 `json:"high"`
+					Low    []float64 `json:"low"`
+					Close  []float64 `json:"close"`
+					Volume []float64 `json:"volume"`
 				} `json:"quote"`
+				Adjclose []struct {
+					Adjclose []float64 `json:"adjclose"`
+				} `json:"adjclose"`
 			} `json:"indicators"`
 		} `json:"result"`
 	} `json:"chart"`
@@ -58,6 +60,7 @@ func (yf *YahooFinanceFetcher) FetchHistoricalData(symbol string, startDate stri
 	}
 
 	quotes := data.Chart.Result[0].Indicators.Quote[0]
+	adjclose := data.Chart.Result[0].Indicators.Adjclose[0].Adjclose
 	timestamps := data.Chart.Result[0].Timestamp
 
 	result := make([]*pb.DataPoint, len(timestamps))
@@ -69,7 +72,7 @@ func (yf *YahooFinanceFetcher) FetchHistoricalData(symbol string, startDate stri
 			High:      quotes.High[i],
 			Low:       quotes.Low[i],
 			Close:     quotes.Close[i],
-			Adjclose:  quotes.Adjclose[i],
+			Adjclose:  adjclose[i],
 			Volume:    quotes.Volume[i],
 		}
 	}
@@ -94,6 +97,7 @@ func (yf *YahooFinanceFetcher) FetchLiveData(symbol string) (*pb.DataPoint, erro
 	}
 
 	quotes := data.Chart.Result[0].Indicators.Quote[0]
+	adjclose := data.Chart.Result[0].Indicators.Adjclose[0].Adjclose
 	timestamps := data.Chart.Result[0].Timestamp
 	latestIndex := len(timestamps) - 1
 
@@ -103,7 +107,7 @@ func (yf *YahooFinanceFetcher) FetchLiveData(symbol string) (*pb.DataPoint, erro
 		High:      quotes.High[latestIndex],
 		Low:       quotes.Low[latestIndex],
 		Close:     quotes.Close[latestIndex],
-		Adjclose:  quotes.Adjclose[latestIndex],
+		Adjclose:  adjclose[latestIndex],
 		Volume:    quotes.Volume[latestIndex],
 	}
 
