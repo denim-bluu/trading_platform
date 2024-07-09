@@ -26,7 +26,13 @@ func (h *Handlers) EvaluateStrategyHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	log.Printf("Evaluating strategy for symbol: %s, strategy type: %s, start date: %s, end date: %s", req.Symbol, req.StrategyType, req.StartDate, req.EndDate)
+	// Fetch account value from the request or set a default value
+	accountValue := req.AccountValue
+	if accountValue <= 0 {
+		accountValue = 100000.0 // Default account value
+	}
+
+	log.Printf("Evaluating strategy for symbol: %s, strategy type: %s, start date: %s, end date: %s, account value: %f", req.Symbol, req.StrategyType, req.StartDate, req.EndDate, accountValue)
 	data, err := h.fetcher.FetchData(req.Symbol, req.StartDate, req.EndDate)
 	if err != nil {
 		log.Printf("Failed to fetch data: %v", err)
@@ -34,24 +40,15 @@ func (h *Handlers) EvaluateStrategyHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	indexValue, err := h.fetcher.FetchIndexValue("^GSPC")
+	indexData, err := h.fetcher.FetchData("^GSPC", req.StartDate, req.EndDate)
 	if err != nil {
-		log.Printf("Failed to fetch index value: %v", err)
+		log.Printf("Failed to fetch index data: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	var strategy strategies.TradingStrategy
-	switch req.StrategyType {
-	case "momentum":
-		strategy = strategies.NewMomentumStrategy()
-	default:
-		log.Printf("Unknown strategy type: %s", req.StrategyType)
-		http.Error(w, "Unknown strategy type", http.StatusBadRequest)
-		return
-	}
-
-	tradeActions := strategy.Evaluate(data.DataPoints, req.StartDate, req.EndDate, indexValue)
+	strategy := strategies.NewMomentumStrategy()
+	tradeActions := strategy.Evaluate(data.DataPoints, req.StartDate, req.EndDate, indexData.DataPoints, accountValue)
 	res := &pb.StrategyResponse{TradeActions: tradeActions}
 
 	log.Println("Successfully evaluated strategy")

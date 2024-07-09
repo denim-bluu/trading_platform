@@ -27,7 +27,7 @@ func main() {
 	fetcher := data.NewYahooFinanceFetcher(cfg.YahooFinanceAPIURL)
 	storage := data.NewDataStorage()
 
-	agg := aggregator.NewAggregator(fetcher, storage, cfg.DataDir)
+	agg := aggregator.NewAggregator(fetcher, storage, cfg.DataDir, time.Duration(cfg.CacheTTL)*time.Hour)
 	handler := handlers.NewHandlers(agg)
 
 	mux := http.NewServeMux()

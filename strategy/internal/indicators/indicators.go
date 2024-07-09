@@ -4,20 +4,44 @@ import (
 	"math"
 )
 
-func CalculateAdjustedRegressionSlope(data []float64, days int) float64 {
-	n := float64(days)
-	sumX := n * (n - 1) / 2
-	sumX2 := n * (n - 1) * (2*n - 1) / 6
-
-	sumY := 0.0
-	sumXY := 0.0
-	for i := 0; i < days; i++ {
-		sumY += data[i]
-		sumXY += float64(i) * data[i]
+func CalculateAdjustedRegressionSlope(prices []float64, period int) float64 {
+	if len(prices) < period {
+		return 0
 	}
 
+	// Log-transform the prices
+	logPrices := make([]float64, period)
+	for i := 0; i < period; i++ {
+		logPrices[i] = math.Log(prices[i])
+	}
+
+	// Calculate linear regression on log-transformed prices
+	var sumX, sumY, sumXY, sumX2 float64
+	for i := 0; i < period; i++ {
+		x := float64(i)
+		y := logPrices[i]
+		sumX += x
+		sumY += y
+		sumXY += x * y
+		sumX2 += x * x
+	}
+
+	n := float64(period)
 	slope := (n*sumXY - sumX*sumY) / (n*sumX2 - sumX*sumX)
-	return slope
+
+	// Calculate R^2 (coefficient of determination)
+	var ssTot, ssRes float64
+	meanY := sumY / n
+	for i := 0; i < period; i++ {
+		y := logPrices[i]
+		x := float64(i)
+		estimatedY := slope*x + (sumY-slope*sumX)/n
+		ssTot += (y - meanY) * (y - meanY)
+		ssRes += (y - estimatedY) * (y - estimatedY)
+	}
+	rSquared := 1 - (ssRes / ssTot)
+
+	return slope * rSquared
 }
 
 func CalculateATR(high, low, close []float64, period int) []float64 {

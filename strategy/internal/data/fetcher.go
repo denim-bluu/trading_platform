@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"time"
 
@@ -12,7 +14,6 @@ import (
 
 type DataFetcher interface {
 	FetchData(symbol, startDate, endDate string) (*pb.HistoricalData, error)
-	FetchIndexValue(index string) (float64, error)
 }
 
 type httpDataFetcher struct {
@@ -40,42 +41,26 @@ func (f *httpDataFetcher) FetchData(symbol, startDate, endDate string) (*pb.Hist
 	}
 	defer resp.Body.Close()
 
+	// Read the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// Log the raw response body
+	log.Printf("Raw response body: %s", string(body))
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to fetch data: status code %d", resp.StatusCode)
 	}
 
 	var data pb.HistoricalData
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+	if err := json.Unmarshal(body, &data); err != nil {
+		// Log the unmarshalling error
+		log.Printf("Failed to unmarshal response: %v", err)
 		return nil, err
 	}
 	return &data, nil
-}
-
-func (f *httpDataFetcher) FetchIndexValue(index string) (float64, error) {
-	url := fmt.Sprintf("%s/get_historical_data", f.aggregatorURL)
-	reqBody := map[string]string{
-		"symbol": index,
-	}
-	reqBodyJSON, _ := json.Marshal(reqBody)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(reqBodyJSON))
-	if err != nil {
-		return 0, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("failed to fetch index value: status code %d", resp.StatusCode)
-	}
-
-	var response pb.HistoricalData
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return 0, err
-	}
-	if len(response.DataPoints) == 0 {
-		return 0, fmt.Errorf("no data points found for index: %s", index)
-	}
-	latestDataPoint := response.DataPoints[len(response.DataPoints)-1]
-	return latestDataPoint.Close, nil
 }
 
 // calculateBufferStartDate calculates a start date 200 days before the provided start date

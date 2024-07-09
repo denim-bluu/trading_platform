@@ -22,9 +22,10 @@ message HistoricalData {
 
 message TradeAction {
     string symbol = 1;
-    string action = 2; // "BUY" or "SELL"
+    string action = 2;
     double price = 3;
-    string timestamp = 4;
+    double size = 4;
+    string timestamp = 5;
 }
 
 message StrategyRequest {
@@ -32,6 +33,7 @@ message StrategyRequest {
     string start_date = 2;
     string end_date = 3;
     string strategy_type = 4;
+    double account_value = 5;
 }
 
 message StrategyResponse {

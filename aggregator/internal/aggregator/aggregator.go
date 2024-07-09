@@ -14,11 +14,20 @@ type Aggregator struct {
 	fetcher data.DataFetcher
 	storage data.DataStorage
 	dataDir string
+	cache   *data.Cache
 }
 
-func NewAggregator(fetcher data.DataFetcher, storage data.DataStorage, dataDir string) *Aggregator {
+func parseTimestamp(timestamp string) (time.Time, error) {
+	dpTime, err := time.Parse("2006-01-02", timestamp)
+	if err != nil {
+		dpTime, err = time.Parse("2006-01-02 15:04:05", timestamp)
+	}
+	return dpTime, err
+}
+
+func NewAggregator(fetcher data.DataFetcher, storage data.DataStorage, dataDir string, cacheTTL time.Duration) *Aggregator {
 	os.MkdirAll(dataDir, os.ModePerm) // Ensure the data directory exists
-	return &Aggregator{fetcher: fetcher, storage: storage, dataDir: dataDir}
+	return &Aggregator{fetcher: fetcher, storage: storage, dataDir: dataDir, cache: data.NewCache(cacheTTL)}
 }
 
 func (a *Aggregator) getFilename(symbol string) string {
@@ -42,6 +51,10 @@ func (a *Aggregator) AggregateHistoricalData(symbol string, startDate string, en
 		log.Printf("Failed to save data: %v", err)
 		return err
 	}
+
+	start, _ := time.Parse("2006-01-02", startDate)
+	end, _ := time.Parse("2006-01-02", endDate)
+	a.cache.Set(symbol, start, end, data)
 
 	log.Println("Successfully saved aggregated data")
 	return nil
@@ -70,21 +83,23 @@ func (a *Aggregator) UpdateLiveData(symbol string) error {
 		log.Printf("Failed to save updated data: %v", err)
 		return err
 	}
+	start, err := parseTimestamp(storedData.DataPoints[0].Timestamp)
+	if err != nil {
+		log.Printf("Failed to parse start timestamp: %v", err)
+		return err
+	}
+	end, err := parseTimestamp(storedData.DataPoints[len(storedData.DataPoints)-1].Timestamp)
+	if err != nil {
+		log.Printf("Failed to parse end timestamp: %v", err)
+		return err
+	}
 
+	a.cache.Set(symbol, start, end, storedData.DataPoints)
 	log.Println("Successfully updated live data")
 	return nil
 }
 
 func (a *Aggregator) GetHistoricalData(symbol string, startDate string, endDate string) ([]*pb.DataPoint, error) {
-	filename := a.getFilename(symbol)
-	log.Printf("Loading data from file: %s", filename)
-	storedData, err := a.storage.LoadData(filename)
-	if err != nil {
-		log.Printf("Failed to load data: %v", err)
-		return nil, err
-	}
-
-	var filteredData []*pb.DataPoint
 	start, err := time.Parse("2006-01-02", startDate)
 	if err != nil {
 		log.Printf("Failed to parse start date: %v", err)
@@ -96,6 +111,19 @@ func (a *Aggregator) GetHistoricalData(symbol string, startDate string, endDate 
 		return nil, err
 	}
 
+	if cachedData, found := a.cache.Get(symbol, start, end); found {
+		log.Printf("Cache hit for symbol: %s", symbol)
+		return cachedData, nil
+	}
+	filename := a.getFilename(symbol)
+	log.Printf("Loading data from file: %s", filename)
+	storedData, err := a.storage.LoadData(filename)
+	if err != nil {
+		log.Printf("Failed to load data: %v", err)
+		return nil, err
+	}
+
+	var filteredData []*pb.DataPoint
 	log.Printf("Filtering data points for symbol: %s from %s to %s", symbol, startDate, endDate)
 	for _, dp := range storedData.DataPoints {
 		if dp.Symbol != symbol {
@@ -114,6 +142,8 @@ func (a *Aggregator) GetHistoricalData(symbol string, startDate string, endDate 
 			filteredData = append(filteredData, dp)
 		}
 	}
+
+	a.cache.Set(symbol, start, end, filteredData)
 
 	log.Printf("Returning %d filtered data points", len(filteredData))
 	return filteredData, nil
