@@ -17,21 +17,21 @@ services:
       args:
         - SERVICE_NAME=strategy
     ports:
-      - "50052:50051"
+      - "50052:50052"
     depends_on:
       - data_service
 
-  # portfolio_service:
-  #   build:
-  #     context: ..
-  #     dockerfile: deployments/Dockerfile
-  #     args:
-  #       - SERVICE_NAME=portfolio
-  #   ports:
-  #     - "50053:50051"
-  #   depends_on:
-  #     - data_service
-  #     - strategy_service
+  portfolio_service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      args:
+        - SERVICE_NAME=portfolio
+    ports:
+      - "50053:50053"
+    depends_on:
+      - data_service
+      - strategy_service
 
   # trade_service:
   #   build:
@@ -40,21 +40,21 @@ services:
   #     args:
   #       - SERVICE_NAME=trade
   #   ports:
-  #     - "50054:50051"
+  #     - "50054:50054"
   #   depends_on:
   #     - portfolio_service
 
-  # backtesting_service:
-  #   build:
-  #     context: ..
-  #     dockerfile: deployments/Dockerfile
-  #     args:
-  #       - SERVICE_NAME=backtesting
-  #   ports:
-  #     - "50055:50051"
-  #   depends_on:
-  #     - data_service
-  #     - strategy_service
+  backtesting_service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      args:
+        - SERVICE_NAME=backtesting
+    ports:
+      - "50055:50055"
+    depends_on:
+      - data_service
+      - strategy_service
 
 networks:
   default:
