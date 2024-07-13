@@ -4,10 +4,11 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/charmbracelet/log"
 
 	pb "momentum-trading-platform/api/proto/data_service"
 

@@ -2,8 +2,9 @@ package main
 
 import (
 	"context"
-	"log"
 	"net"
+
+	"github.com/charmbracelet/log"
 
 	pb "momentum-trading-platform/api/proto/data_service"
 
@@ -16,6 +17,7 @@ type server struct {
 
 func (s *server) GetStockData(ctx context.Context, req *pb.StockRequest) (*pb.StockResponse, error) {
 	// Mock implementation
+	log.Info("Request for stock data: %s on %s", req.Symbol, req.Date)
 	return &pb.StockResponse{
 		Symbol: req.Symbol,
 		Date:   req.Date,

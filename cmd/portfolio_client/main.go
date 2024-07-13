@@ -4,8 +4,9 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
+
+	"github.com/charmbracelet/log"
 
 	pb "momentum-trading-platform/api/proto/portfolio_service"
 

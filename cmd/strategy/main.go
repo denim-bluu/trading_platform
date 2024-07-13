@@ -3,10 +3,10 @@ package main
 
 import (
 	"context"
-	"log"
 	"math/rand"
 	"net"
-	"time"
+
+	"github.com/charmbracelet/log"
 
 	pb "momentum-trading-platform/api/proto/strategy_service"
 
@@ -40,6 +40,7 @@ func (s *server) GetTradingSignals(ctx context.Context, req *pb.SignalRequest) (
 		atr := 1.0 + rand.Float64()*4.0       // Mock ATR between 1 and 5
 		positionSize := 1000000 * 0.001 / atr // Assuming $1M account and 10 bps risk per stock
 
+		log.Info("Signal for %s: %s, Position Size: %.2f", symbol, signalType, positionSize)
 		signals = append(signals, &pb.StockSignal{
 			Symbol:       symbol,
 			Signal:       signalType,
@@ -54,8 +55,6 @@ func (s *server) GetTradingSignals(ctx context.Context, req *pb.SignalRequest) (
 }
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
-
 	lis, err := net.Listen("tcp", ":50052")
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)

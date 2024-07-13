@@ -3,10 +3,10 @@ package main
 
 import (
 	"context"
-	"log"
 	"math/rand"
 	"net"
-	"time"
+
+	"github.com/charmbracelet/log"
 
 	pb "momentum-trading-platform/api/proto/portfolio_service"
 
@@ -22,7 +22,7 @@ type server struct {
 func newServer() *server {
 	return &server{
 		portfolio: make(map[string]*pb.Position),
-		cash:      1000000, // Start with $1,000,000
+		cash:      1000000,
 	}
 }
 
@@ -34,6 +34,10 @@ func (s *server) GetPortfolioStatus(ctx context.Context, req *pb.PortfolioReques
 		positions = append(positions, pos)
 		totalValue += pos.MarketValue
 	}
+
+	log.Debug("--- Portfolio Status ---")
+	log.Info("Portfolio status requested: %v", positions)
+	log.Info("Total value: ", totalValue)
 
 	return &pb.PortfolioStatus{
 		Positions:   positions,
@@ -52,11 +56,13 @@ func (s *server) ProcessTradingSignals(ctx context.Context, signals *pb.TradingS
 			if trade != nil {
 				trades = append(trades, trade)
 			}
+			log.Info("Buy signal for %s with position size %.2f", signal.Symbol, signal.PositionSize)
 		case pb.TradeType_SELL:
 			trade := s.executeSell(signal.Symbol)
 			if trade != nil {
 				trades = append(trades, trade)
 			}
+			log.Info("Sell signal for %s", signal.Symbol)
 		}
 	}
 
@@ -68,7 +74,10 @@ func (s *server) ProcessTradingSignals(ctx context.Context, signals *pb.TradingS
 }
 
 func (s *server) executeBuy(symbol string, positionSize float64) *pb.Trade {
-	price := 100 + rand.Float64()*100 // Mock price between 100 and 200
+	// Mock price between 100 and 200, this should be replaced with real data from Data Service
+	price := 100 + rand.Float64()*100
+
+	// Calculate quantity based on position size ($ terms) and price
 	quantity := int32(positionSize / price)
 
 	if quantity > 0 {
@@ -94,6 +103,8 @@ func (s *server) executeBuy(symbol string, positionSize float64) *pb.Trade {
 			}
 		}
 
+		log.Info("Bought %d shares of %s at %.2f", quantity, symbol, price)
+
 		return &pb.Trade{
 			Symbol:   symbol,
 			Type:     pb.TradeType_BUY,
@@ -103,27 +114,6 @@ func (s *server) executeBuy(symbol string, positionSize float64) *pb.Trade {
 	}
 
 	return nil
-}
-
-func (s *server) RebalancePortfolio(ctx context.Context, req *pb.RebalanceRequest) (*pb.PortfolioUpdate, error) {
-	// Simplified rebalancing: sell 10% of each position
-	trades := make([]*pb.Trade, 0)
-
-	for symbol, pos := range s.portfolio {
-		sellQuantity := int32(float64(pos.Quantity) * 0.1)
-		if sellQuantity > 0 {
-			trade := s.executeSell(symbol)
-			if trade != nil {
-				trades = append(trades, trade)
-			}
-		}
-	}
-
-	status, _ := s.GetPortfolioStatus(ctx, &pb.PortfolioRequest{})
-	return &pb.PortfolioUpdate{
-		Trades:        trades,
-		UpdatedStatus: status,
-	}, nil
 }
 
 func (s *server) executeSell(symbol string) *pb.Trade {
@@ -138,16 +128,37 @@ func (s *server) executeSell(symbol string) *pb.Trade {
 			Price:    price,
 		}
 
+		log.Info("Sold %d shares of %s at %.2f", pos.Quantity, symbol)
+
 		delete(s.portfolio, symbol)
 		return trade
 	}
 
 	return nil
 }
+func (s *server) RebalancePortfolio(ctx context.Context, req *pb.RebalanceRequest) (*pb.PortfolioUpdate, error) {
+	// Simplified rebalancing: sell 10% of each position
+	trades := make([]*pb.Trade, 0)
+
+	for symbol, pos := range s.portfolio {
+		sellQuantity := int32(float64(pos.Quantity) * 0.1)
+		if sellQuantity > 0 {
+			trade := s.executeSell(symbol)
+			if trade != nil {
+				trades = append(trades, trade)
+			}
+		}
+		log.Info("Rebalanced %s, sold %d shares", symbol, sellQuantity)
+	}
+
+	status, _ := s.GetPortfolioStatus(ctx, &pb.PortfolioRequest{})
+	return &pb.PortfolioUpdate{
+		Trades:        trades,
+		UpdatedStatus: status,
+	}, nil
+}
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
-
 	lis, err := net.Listen("tcp", ":50053")
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
