@@ -133,12 +133,14 @@ func (s *server) fetchStockData(ctx context.Context, symbol, startDate, endDate,
 	url := fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s?period1=%s&period2=%s&interval=%s",
 		symbol, startDate, endDate, interval)
 
+	// Create request
 	httpReq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		s.logger.WithError(err).Error("Failed to create request")
 		return nil, status.Errorf(codes.Internal, "failed to create request: %v", err)
 	}
 
+	// Get response from Yahoo Finance
 	resp, err := s.httpClient.Do(httpReq)
 	if err != nil {
 		s.logger.WithError(err).Error("Failed to fetch data from Yahoo Finance")
