@@ -1,21 +1,44 @@
+// api/proto/data_service.proto
 syntax = "proto3";
 
 package dataservice;
 
-option go_package = "momentum-trading-platform/api/proto";
+option go_package = "momentum-trading-platform/api/proto/data_service";
 
 service DataService {
   rpc GetStockData(StockRequest) returns (StockResponse) {}
+  rpc GetBatchStockData(BatchStockRequest) returns (BatchStockResponse) {}
 }
 
 message StockRequest {
   string symbol = 1;
-  string date = 2;
+  string start_date = 2;
+  string end_date = 3;
+  string interval = 4;  // 1d, 1wk, 1mo
 }
 
 message StockResponse {
   string symbol = 1;
-  string date = 2;
-  double price = 3;
-  double volume = 4;
+  repeated StockDataPoint data_points = 2;
+}
+
+message StockDataPoint {
+  int64 timestamp = 1;
+  double open = 2;
+  double high = 3;
+  double low = 4;
+  double close = 5;
+  double adjusted_close = 6;
+  int64 volume = 7;
+}
+
+message BatchStockRequest {
+  repeated string symbols = 1;
+  string start_date = 2;
+  string end_date = 3;
+  string interval = 4;
+}
+
+message BatchStockResponse {
+  map<string, StockResponse> stock_data = 1;
 }
