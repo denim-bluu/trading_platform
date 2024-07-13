@@ -2,38 +2,48 @@
 
 ## Service Responsibilities
 
-1. Data Service:
-   - Aggregates and stores historical and real-time market data
-   - Calculates and stores common indicators (e.g., moving averages, ATR)
-   - Provides efficient data retrieval for other services
-   - Handles data normalization and cleaning
+1. ✅ Data Service:
 
-2. Strategy Service:
-   - Implements the momentum trading strategy logic
-   - Calculates stock rankings based on volatility-adjusted momentum
-   - Generates buy/sell signals based on strategy rules
-   - Allows for easy modification and addition of new strategies
+   - Fetch historical stock data from external sources (e.g., Yahoo Finance API)
+   - Provide both single stock and batch stock data retrieval
+   - Return OHLC (Open, High, Low, Close) price data, adjusted close prices, and volume
+   - Handle date range and interval specifications in requests
+   - Implement rate limiting to respect external API usage policies
+   - TODO: Implement caching to reduce repeated API calls
 
-3. Portfolio Service:
+2. ✅ Momentum Strategy Service:
+
+   - Calculate momentum scores using exponential regression and R-squared for 90-day periods
+   - Generate buy/hold signals based on momentum and price relative to 100-day moving average
+   - Calculate ATR (Average True Range) for position sizing
+   - Implement 15% gap check for the past 90 days
+   - Rank stocks based on momentum scores
+   - Filter to keep only the top 20% of stocks
+   - Calculate position sizes based on ATR for risk parity
+   - Provide a batch processing capability for multiple stocks
+   - Sort and return signals for the top-ranked stocks
+   - Logging of strategy calculations and decisions
+
+3. TODO: Portfolio Service:
    - Manages the current portfolio composition
    - Handles position sizing and risk management
    - Performs weekly portfolio rebalancing
    - Tracks performance and generates reports
 
-4. Trade Execution Service:
+4. TODO: Trade Execution Service:
    - Interfaces with various brokers and exchanges
    - Executes trades based on signals from the Portfolio Service
    - Handles order management and trade confirmation
    - Provides real-time trade status updates
 
-5. Backtesting Service:
+5. TODO: Backtesting Service:
    - Simulates trading strategies on historical data
    - Generates performance reports and statistics
 
-6. API Gateway (TBD):
+6. TODO: API Gateway:
    - Provides a unified entry point for external requests
 
-7. Scheduler Service (TBD):
+7. TODO: Scheduler Service:
    - Manages the timing of various trading activities
    - Triggers weekly trading actions (every Wednesday)
    - Initiates bi-weekly position size rebalancing
@@ -41,17 +51,13 @@
 
 ```mermaid
 graph TD
-    A[Data Service] -->|Provides market data| B[Strategy Service]
-    A -->|Provides market data| C[Portfolio Service]
-    B -->|Generates signals| C
-    C -->|Executes trades| D[Trade Execution Service]
-    E[Backtesting Service] -->|Uses historical data| A
-    E -->|Tests strategies| B
-    F[API Gateway] -->|Routes requests| A
-    F -->|Routes requests| B
-    F -->|Routes requests| C
-    F -->|Routes requests| D
-    F -->|Routes requests| E
-    G[Scheduler Service] -->|Triggers actions| B
-    G -->|Triggers actions| C
+    A[Scheduler Service] -->|Triggers weekly| B[Portfolio Service]
+    A -->|Triggers bi-weekly| B
+    B -->|Requests data| C[Data Service]
+    B -->|Requests signals| D[Strategy Service]
+    B -->|Sends trade orders| E[Trade Execution Service]
+    C -->|Provides market data| B
+    C -->|Provides market data| D
+    D -->|Provides signals| B
+    E -->|Executes trades| F[Broker/Exchange]
 ```
