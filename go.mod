@@ -4,7 +4,6 @@ go 1.22.5
 
 require (
 	github.com/charmbracelet/log v0.4.0
-	github.com/golang/protobuf v1.5.4
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/time v0.5.0
