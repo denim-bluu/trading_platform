@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
-	"github.com/golang/protobuf/proto"
 
 	pb "momentum-trading-platform/api/proto/portfolio_service"
 
@@ -42,12 +41,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("could not process trading signals: %v", err)
 	}
-	log.Printf("Portfolio Update After Signals: %+v\n", proto.MarshalTextString(update))
+	log.Printf("Portfolio Update After Signals: %+v\n", update)
 
 	// Perform a rebalance
 	rebalanceUpdate, err := client.RebalancePortfolio(ctx, &pb.RebalanceRequest{Date: time.Now().Format("2006-01-02")})
 	if err != nil {
 		log.Fatalf("could not rebalance portfolio: %v", err)
 	}
-	log.Printf("Portfolio Update After Rebalance: %+v\n", proto.MarshalTextString(rebalanceUpdate))
+	log.Printf("Portfolio Update After Rebalance: %+v\n", rebalanceUpdate)
 }
