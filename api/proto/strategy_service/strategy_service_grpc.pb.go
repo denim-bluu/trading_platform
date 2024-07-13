@@ -21,14 +21,14 @@ import (
 const _ = grpc.SupportPackageIsVersion8
 
 const (
-	StrategyService_GetTradingSignals_FullMethodName = "/strategyservice.StrategyService/GetTradingSignals"
+	StrategyService_GenerateSignals_FullMethodName = "/strategyservice.StrategyService/GenerateSignals"
 )
 
 // StrategyServiceClient is the client API for StrategyService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type StrategyServiceClient interface {
-	GetTradingSignals(ctx context.Context, in *SignalRequest, opts ...grpc.CallOption) (*SignalResponse, error)
+	GenerateSignals(ctx context.Context, in *SignalRequest, opts ...grpc.CallOption) (*SignalResponse, error)
 }
 
 type strategyServiceClient struct {
@@ -39,10 +39,10 @@ func NewStrategyServiceClient(cc grpc.ClientConnInterface) StrategyServiceClient
 	return &strategyServiceClient{cc}
 }
 
-func (c *strategyServiceClient) GetTradingSignals(ctx context.Context, in *SignalRequest, opts ...grpc.CallOption) (*SignalResponse, error) {
+func (c *strategyServiceClient) GenerateSignals(ctx context.Context, in *SignalRequest, opts ...grpc.CallOption) (*SignalResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SignalResponse)
-	err := c.cc.Invoke(ctx, StrategyService_GetTradingSignals_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, StrategyService_GenerateSignals_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func (c *strategyServiceClient) GetTradingSignals(ctx context.Context, in *Signa
 // All implementations must embed UnimplementedStrategyServiceServer
 // for forward compatibility
 type StrategyServiceServer interface {
-	GetTradingSignals(context.Context, *SignalRequest) (*SignalResponse, error)
+	GenerateSignals(context.Context, *SignalRequest) (*SignalResponse, error)
 	mustEmbedUnimplementedStrategyServiceServer()
 }
 
@@ -61,8 +61,8 @@ type StrategyServiceServer interface {
 type UnimplementedStrategyServiceServer struct {
 }
 
-func (UnimplementedStrategyServiceServer) GetTradingSignals(context.Context, *SignalRequest) (*SignalResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetTradingSignals not implemented")
+func (UnimplementedStrategyServiceServer) GenerateSignals(context.Context, *SignalRequest) (*SignalResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GenerateSignals not implemented")
 }
 func (UnimplementedStrategyServiceServer) mustEmbedUnimplementedStrategyServiceServer() {}
 
@@ -77,20 +77,20 @@ func RegisterStrategyServiceServer(s grpc.ServiceRegistrar, srv StrategyServiceS
 	s.RegisterService(&StrategyService_ServiceDesc, srv)
 }
 
-func _StrategyService_GetTradingSignals_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _StrategyService_GenerateSignals_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SignalRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(StrategyServiceServer).GetTradingSignals(ctx, in)
+		return srv.(StrategyServiceServer).GenerateSignals(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: StrategyService_GetTradingSignals_FullMethodName,
+		FullMethod: StrategyService_GenerateSignals_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(StrategyServiceServer).GetTradingSignals(ctx, req.(*SignalRequest))
+		return srv.(StrategyServiceServer).GenerateSignals(ctx, req.(*SignalRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -103,8 +103,8 @@ var StrategyService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*StrategyServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "GetTradingSignals",
-			Handler:    _StrategyService_GetTradingSignals_Handler,
+			MethodName: "GenerateSignals",
+			Handler:    _StrategyService_GenerateSignals_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

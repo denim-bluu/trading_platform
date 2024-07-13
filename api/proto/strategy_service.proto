@@ -6,22 +6,25 @@ package strategyservice;
 option go_package = "momentum-trading-platform/api/proto/strategy_service";
 
 service StrategyService {
-  rpc GetTradingSignals(SignalRequest) returns (SignalResponse) {}
+  rpc GenerateSignals(SignalRequest) returns (SignalResponse) {}
 }
 
 message SignalRequest {
-  string date = 1;
+  repeated string symbols = 1;
+  string start_date = 2;
+  string end_date = 3;
+  string interval = 4;  // 1d, 1wk, 1mo
 }
 
 message SignalResponse {
   repeated StockSignal signals = 1;
-  bool is_market_regime_positive = 2;
 }
 
 message StockSignal {
   string symbol = 1;
   SignalType signal = 2;
   double position_size = 3;
+  double momentum_score = 4;
 }
 
 enum SignalType {

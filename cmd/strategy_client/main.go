@@ -2,14 +2,10 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"os"
-	"strings"
+	"log"
 	"time"
-
-	"github.com/charmbracelet/log"
 
 	pb "momentum-trading-platform/api/proto/strategy_service"
 
@@ -23,27 +19,31 @@ func main() {
 		log.Fatalf("did not connect: %v", err)
 	}
 	defer conn.Close()
-	client := pb.NewStrategyServiceClient(conn)
+	c := pb.NewStrategyServiceClient(conn)
 
-	reader := bufio.NewReader(os.Stdin)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+	defer cancel()
 
-	for {
-		fmt.Print("Enter date (YYYY-MM-DD): ")
-		date, _ := reader.ReadString('\n')
-		date = strings.TrimSpace(date)
+	symbols := []string{"AAPL", "GOOGL", "MSFT", "AMZN", "TSLA", "NVDA", "PYPL", "INTC", "NFLX", "ADBE"}
+	startDate := fmt.Sprintf("%d", time.Now().AddDate(-1, 0, 0).Unix())
+	endDate := fmt.Sprintf("%d", time.Now().Unix())
+	interval := "1d"
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		r, err := client.GetTradingSignals(ctx, &pb.SignalRequest{Date: date})
-		cancel()
-		if err != nil {
-			log.Printf("Error: %v", err)
-			continue
-		}
-		fmt.Printf("Trading Signals for %s:\n", date)
-		fmt.Printf("Market Regime: %t\n", r.IsMarketRegimePositive)
-		for _, signal := range r.Signals {
-			fmt.Printf("Stock: %s, Signal: %s, Position Size: %.2f\n",
-				signal.Symbol, signal.Signal, signal.PositionSize)
-		}
+	req := &pb.SignalRequest{
+		Symbols:   symbols,
+		StartDate: startDate,
+		EndDate:   endDate,
+		Interval:  interval,
+	}
+
+	resp, err := c.GenerateSignals(ctx, req)
+	if err != nil {
+		log.Fatalf("could not generate signals: %v", err)
+	}
+
+	log.Println("Generated Signals:")
+	for _, signal := range resp.Signals {
+		log.Printf("Symbol: %s, Signal: %s, Position Size: %.2f, Momentum Score: %.4f",
+			signal.Symbol, signal.Signal, signal.PositionSize, signal.MomentumScore)
 	}
 }
