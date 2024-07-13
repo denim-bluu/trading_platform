@@ -35,10 +35,6 @@ func (s *server) GetPortfolioStatus(ctx context.Context, req *pb.PortfolioReques
 		totalValue += pos.MarketValue
 	}
 
-	log.Debug("--- Portfolio Status ---")
-	log.Info("Portfolio status requested: %v", positions)
-	log.Info("Total value: ", totalValue)
-
 	return &pb.PortfolioStatus{
 		Positions:   positions,
 		CashBalance: s.cash,
@@ -56,13 +52,13 @@ func (s *server) ProcessTradingSignals(ctx context.Context, signals *pb.TradingS
 			if trade != nil {
 				trades = append(trades, trade)
 			}
-			log.Info("Buy signal for %s with position size %.2f", signal.Symbol, signal.PositionSize)
+			log.Infof("Buy signal for %s with position size %.2f", signal.Symbol, signal.PositionSize)
 		case pb.TradeType_SELL:
 			trade := s.executeSell(signal.Symbol)
 			if trade != nil {
 				trades = append(trades, trade)
 			}
-			log.Info("Sell signal for %s", signal.Symbol)
+			log.Infof("Sell signal for %s", signal.Symbol)
 		}
 	}
 
@@ -102,8 +98,7 @@ func (s *server) executeBuy(symbol string, positionSize float64) *pb.Trade {
 				MarketValue:  cost,
 			}
 		}
-
-		log.Info("Bought %d shares of %s at %.2f", quantity, symbol, price)
+		log.Infof("Bought %d shares of %s at %.2f", quantity, symbol, price)
 
 		return &pb.Trade{
 			Symbol:   symbol,
@@ -128,7 +123,7 @@ func (s *server) executeSell(symbol string) *pb.Trade {
 			Price:    price,
 		}
 
-		log.Info("Sold %d shares of %s at %.2f", pos.Quantity, symbol)
+		log.Infof("Sold %d shares of %s at %.2f", pos.Quantity, symbol, price)
 
 		delete(s.portfolio, symbol)
 		return trade
@@ -148,7 +143,7 @@ func (s *server) RebalancePortfolio(ctx context.Context, req *pb.RebalanceReques
 				trades = append(trades, trade)
 			}
 		}
-		log.Info("Rebalanced %s, sold %d shares", symbol, sellQuantity)
+		log.Infof("Rebalanced %s, sold %d shares", symbol, sellQuantity)
 	}
 
 	status, _ := s.GetPortfolioStatus(ctx, &pb.PortfolioRequest{})

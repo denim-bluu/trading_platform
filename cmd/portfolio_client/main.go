@@ -3,10 +3,10 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/charmbracelet/log"
+	"github.com/golang/protobuf/proto"
 
 	pb "momentum-trading-platform/api/proto/portfolio_service"
 
@@ -30,24 +30,24 @@ func main() {
 	if err != nil {
 		log.Fatalf("could not get portfolio status: %v", err)
 	}
-	fmt.Printf("Initial Portfolio Status: %+v\n", status)
+	log.Infof("Initial Portfolio Status: %+v\n", status)
 
 	// Process some mock trading signals
 	update, err := client.ProcessTradingSignals(ctx, &pb.TradingSignals{
 		Signals: []*pb.Signal{
-			{Symbol: "AAPL", Type: pb.TradeType_BUY, PositionSize: 1},
-			{Symbol: "GOOGL", Type: pb.TradeType_BUY, PositionSize: 5},
+			{Symbol: "AAPL", Type: pb.TradeType_BUY, PositionSize: 100000},
+			{Symbol: "GOOGL", Type: pb.TradeType_BUY, PositionSize: 100000},
 		},
 	})
 	if err != nil {
 		log.Fatalf("could not process trading signals: %v", err)
 	}
-	fmt.Printf("Portfolio Update After Signals: %+v\n", update)
+	log.Printf("Portfolio Update After Signals: %+v\n", proto.MarshalTextString(update))
 
 	// Perform a rebalance
 	rebalanceUpdate, err := client.RebalancePortfolio(ctx, &pb.RebalanceRequest{Date: time.Now().Format("2006-01-02")})
 	if err != nil {
 		log.Fatalf("could not rebalance portfolio: %v", err)
 	}
-	fmt.Printf("Portfolio Update After Rebalance: %+v\n", rebalanceUpdate)
+	log.Printf("Portfolio Update After Rebalance: %+v\n", proto.MarshalTextString(rebalanceUpdate))
 }
