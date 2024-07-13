@@ -1,0 +1,44 @@
+// api/proto/trade_execution_service.proto
+syntax = "proto3";
+
+package tradeexecutionservice;
+
+option go_package = "momentum-trading-platform/api/proto/trade_execution_service";
+
+service TradeExecutionService {
+  rpc ExecuteTrade(TradeOrder) returns (TradeResult) {}
+  rpc GetExecutionStatus(ExecutionStatusRequest) returns (TradeResult) {}
+}
+
+message TradeOrder {
+  string symbol = 1;
+  OrderType type = 2;
+  int32 quantity = 3;
+  double limit_price = 4;  // Optional, for limit orders
+  string order_id = 5;
+}
+
+enum OrderType {
+  MARKET = 0;
+  LIMIT = 1;
+}
+
+message TradeResult {
+  string order_id = 1;
+  ExecutionStatus status = 2;
+  double executed_price = 3;
+  int32 executed_quantity = 4;
+  string execution_time = 5;
+}
+
+message ExecutionStatusRequest {
+  string order_id = 1;
+}
+
+enum ExecutionStatus {
+  PENDING = 0;
+  PARTIALLY_FILLED = 1;
+  FILLED = 2;
+  CANCELLED = 3;
+  REJECTED = 4;
+}
