@@ -1,0 +1,32 @@
+// api/proto/strategy_service.proto
+syntax = "proto3";
+
+package strategyservice;
+
+option go_package = "momentum-trading-platform/api/proto/strategy_service";
+
+service StrategyService {
+  rpc GetTradingSignals(SignalRequest) returns (SignalResponse) {}
+}
+
+message SignalRequest {
+  string date = 1;
+}
+
+message SignalResponse {
+  repeated StockSignal signals = 1;
+  bool is_market_regime_positive = 2;
+}
+
+message StockSignal {
+  string symbol = 1;
+  SignalType signal = 2;
+  double momentum_score = 3;
+  double position_size = 4;
+}
+
+enum SignalType {
+  HOLD = 0;
+  BUY = 1;
+  SELL = 2;
+}

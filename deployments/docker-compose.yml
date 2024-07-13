@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  data_service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      args:
+        - SERVICE_NAME=data
+    ports:
+      - "50051:50051"
+
+  strategy_service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      args:
+        - SERVICE_NAME=strategy
+    ports:
+      - "50052:50051"
+    depends_on:
+      - data_service
+
+  # portfolio_service:
+  #   build:
+  #     context: ..
+  #     dockerfile: deployments/Dockerfile
+  #     args:
+  #       - SERVICE_NAME=portfolio
+  #   ports:
+  #     - "50053:50051"
+  #   depends_on:
+  #     - data_service
+  #     - strategy_service
+
+  # trade_service:
+  #   build:
+  #     context: ..
+  #     dockerfile: deployments/Dockerfile
+  #     args:
+  #       - SERVICE_NAME=trade
+  #   ports:
+  #     - "50054:50051"
+  #   depends_on:
+  #     - portfolio_service
+
+  # backtesting_service:
+  #   build:
+  #     context: ..
+  #     dockerfile: deployments/Dockerfile
+  #     args:
+  #       - SERVICE_NAME=backtesting
+  #   ports:
+  #     - "50055:50051"
+  #   depends_on:
+  #     - data_service
+  #     - strategy_service
+
+networks:
+  default:
+    driver: bridge

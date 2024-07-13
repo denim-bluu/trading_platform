@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package dataservice;
+
+option go_package = "momentum-trading-platform/api/proto";
+
+service DataService {
+  rpc GetStockData(StockRequest) returns (StockResponse) {}
+}
+
+message StockRequest {
+  string symbol = 1;
+  string date = 2;
+}
+
+message StockResponse {
+  string symbol = 1;
+  string date = 2;
+  double price = 3;
+  double volume = 4;
+}
