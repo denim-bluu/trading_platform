@@ -21,12 +21,11 @@ message SignalResponse {
 message StockSignal {
   string symbol = 1;
   SignalType signal = 2;
-  double momentum_score = 3;
-  double position_size = 4;
+  double position_size = 3;
 }
 
 enum SignalType {
-  HOLD = 0;
-  BUY = 1;
-  SELL = 2;
+  SIGNAL_TYPE_HOLD = 1;
+  SIGNAL_TYPE_BUY = 2;
+  SIGNAL_TYPE_SELL = 3;
 }

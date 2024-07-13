@@ -1,0 +1,62 @@
+// api/proto/portfolio_service.proto
+syntax = "proto3";
+
+package portfolioservice;
+
+option go_package = "momentum-trading-platform/api/proto/portfolio_service";
+
+service PortfolioService {
+  rpc GetPortfolioStatus(PortfolioRequest) returns (PortfolioStatus) {}
+  rpc ProcessTradingSignals(TradingSignals) returns (PortfolioUpdate) {}
+  rpc RebalancePortfolio(RebalanceRequest) returns (PortfolioUpdate) {}
+}
+
+message PortfolioRequest {
+  string date = 1;
+}
+
+message PortfolioStatus {
+  repeated Position positions = 1;
+  double cash_balance = 2;
+  double total_value = 3;
+}
+
+message Position {
+  string symbol = 1;
+  int32 quantity = 2;
+  double average_price = 3;
+  double current_price = 4;
+  double market_value = 5;
+}
+
+message TradingSignals {
+  repeated Signal signals = 1;
+}
+
+message Signal {
+  string symbol = 1;
+  TradeType type = 2;
+  double position_size = 3;
+}
+
+enum TradeType {
+  TRADE_TYPE_HOLD = 1;
+  TRADE_TYPE_BUY = 2;
+  TRADE_TYPE_SELL = 3;
+}
+
+message PortfolioUpdate {
+  repeated Trade trades = 1;
+  PortfolioStatus updated_status = 2;
+}
+
+message Trade {
+  string symbol = 1;
+  TradeType type = 2;
+  int32 quantity = 3;
+  double price = 4;
+}
+
+message RebalanceRequest {
+  string date = 1;
+}

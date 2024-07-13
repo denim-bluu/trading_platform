@@ -6,7 +6,6 @@ import (
 	"log"
 	"math/rand"
 	"net"
-	"sort"
 	"time"
 
 	pb "momentum-trading-platform/api/proto/strategy_service"
@@ -26,40 +25,25 @@ type Stock struct {
 var mockStocks = []string{"AAPL", "GOOGL", "MSFT", "AMZN", "FB", "TSLA", "NVDA", "JPM", "JNJ", "V"}
 
 func (s *server) GetTradingSignals(ctx context.Context, req *pb.SignalRequest) (*pb.SignalResponse, error) {
-	// Mock market regime (70% chance of positive regime)
 	isMarketRegimePositive := rand.Float32() < 0.7
 
-	// Generate mock momentum scores
-	stocks := make([]Stock, len(mockStocks))
-	for i, symbol := range mockStocks {
-		stocks[i] = Stock{
-			Symbol:        symbol,
-			MomentumScore: rand.Float64() * 100, // Random score between 0 and 100
-		}
-	}
-
-	// Sort stocks by momentum score
-	sort.Slice(stocks, func(i, j int) bool {
-		return stocks[i].MomentumScore > stocks[j].MomentumScore
-	})
-
-	// Generate signals
 	signals := make([]*pb.StockSignal, 0)
-	for i, stock := range stocks {
-		var signal pb.SignalType
-		if i < len(stocks)/5 && isMarketRegimePositive { // Top 20% and positive market regime
-			signal = pb.SignalType_BUY
-		} else if i >= len(stocks)/2 { // Bottom 50%
-			signal = pb.SignalType_SELL
-		} else {
-			signal = pb.SignalType_HOLD
+	for _, symbol := range mockStocks {
+		signalType := pb.SignalType_HOLD
+		if isMarketRegimePositive && rand.Float32() < 0.3 {
+			signalType = pb.SignalType_BUY
+		} else if !isMarketRegimePositive && rand.Float32() < 0.3 {
+			signalType = pb.SignalType_SELL
 		}
+
+		// Calculate position size based on risk parity
+		atr := 1.0 + rand.Float64()*4.0       // Mock ATR between 1 and 5
+		positionSize := 1000000 * 0.001 / atr // Assuming $1M account and 10 bps risk per stock
 
 		signals = append(signals, &pb.StockSignal{
-			Symbol:        stock.Symbol,
-			Signal:        signal,
-			MomentumScore: stock.MomentumScore,
-			PositionSize:  100000 / stock.MomentumScore, // Simplified position sizing
+			Symbol:       symbol,
+			Signal:       signalType,
+			PositionSize: positionSize,
 		})
 	}
 

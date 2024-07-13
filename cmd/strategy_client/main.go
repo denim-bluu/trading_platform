@@ -13,10 +13,11 @@ import (
 	pb "momentum-trading-platform/api/proto/strategy_service"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
-	conn, err := grpc.Dial("localhost:50052", grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.NewClient("localhost:50052", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
@@ -40,8 +41,8 @@ func main() {
 		fmt.Printf("Trading Signals for %s:\n", date)
 		fmt.Printf("Market Regime: %t\n", r.IsMarketRegimePositive)
 		for _, signal := range r.Signals {
-			fmt.Printf("Stock: %s, Signal: %s, Momentum Score: %.2f, Position Size: %.2f\n",
-				signal.Symbol, signal.Signal, signal.MomentumScore, signal.PositionSize)
+			fmt.Printf("Stock: %s, Signal: %s, Position Size: %.2f\n",
+				signal.Symbol, signal.Signal, signal.PositionSize)
 		}
 	}
 }
