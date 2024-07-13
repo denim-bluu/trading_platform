@@ -32,4 +32,4 @@ for proto_file in $PROTO_DIR/*.proto; do
     echo "Generated files for ${service_name}"
 done
 
-echo "Proto files generat
+echo "Proto files generat"

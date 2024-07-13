@@ -25,7 +25,7 @@ message StockSignal {
 }
 
 enum SignalType {
-  SIGNAL_TYPE_HOLD = 1;
-  SIGNAL_TYPE_BUY = 2;
-  SIGNAL_TYPE_SELL = 3;
+  HOLD = 0;
+  BUY = 1;
+  SELL = 2;
 }

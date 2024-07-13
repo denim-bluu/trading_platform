@@ -40,9 +40,9 @@ message Signal {
 }
 
 enum TradeType {
-  TRADE_TYPE_HOLD = 1;
-  TRADE_TYPE_BUY = 2;
-  TRADE_TYPE_SELL = 3;
+  HOLD = 0;
+  BUY = 1;
+  SELL = 2;
 }
 
 message PortfolioUpdate {
