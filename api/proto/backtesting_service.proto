@@ -1,0 +1,46 @@
+// api/proto/backtesting_service.proto
+syntax = "proto3";
+
+package backtestingservice;
+
+option go_package = "momentum-trading-platform/api/proto/backtesting_service";
+
+service BacktestingService {
+  rpc RunBacktest(BacktestRequest) returns (BacktestResult) {}
+  rpc GetBacktestStatus(BacktestStatusRequest) returns (BacktestStatus) {}
+}
+
+message BacktestRequest {
+  string start_date = 1;
+  string end_date = 2;
+  double initial_capital = 3;
+  repeated string symbols = 4;
+}
+
+message BacktestResult {
+  string backtest_id = 1;
+  BacktestStatus status = 2;
+  double final_portfolio_value = 3;
+  double total_return = 4;
+  double sharpe_ratio = 5;
+  double max_drawdown = 6;
+  repeated TradeRecord trades = 7;
+}
+
+message TradeRecord {
+  string date = 1;
+  string symbol = 2;
+  string action = 3;
+  int32 quantity = 4;
+  double price = 5;
+}
+
+message BacktestStatusRequest {
+  string backtest_id = 1;
+}
+
+message BacktestStatus {
+  string backtest_id = 1;
+  string status = 2;
+  double progress = 3;
+}
