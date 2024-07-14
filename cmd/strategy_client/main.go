@@ -4,8 +4,9 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
+
+	"github.com/charmbracelet/log"
 
 	pb "momentum-trading-platform/api/proto/strategy_service"
 
@@ -41,9 +42,9 @@ func main() {
 		log.Fatalf("could not generate signals: %v", err)
 	}
 
-	log.Println("Generated Signals:")
+	log.Print("Generated Signals:")
 	for _, signal := range resp.Signals {
-		log.Printf("Symbol: %s, Signal: %s, Position Size: %.2f, Momentum Score: %.4f",
-			signal.Symbol, signal.Signal, signal.PositionSize, signal.MomentumScore)
+		log.Printf("Symbol: %s, Signal: %s, Risk Unit: %.2f, Momentum Score: %.4f, Last Close: %.2f\n",
+			signal.Symbol, signal.Signal, signal.RiskUnit, signal.MomentumScore, signal.CurrentPrice)
 	}
 }

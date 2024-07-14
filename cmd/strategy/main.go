@@ -7,8 +7,6 @@ import (
 	"net"
 	"os"
 	"sort"
-	"strconv"
-	"time"
 
 	datapb "momentum-trading-platform/api/proto/data_service"
 	pb "momentum-trading-platform/api/proto/strategy_service"
@@ -23,18 +21,6 @@ type Server struct {
 	pb.UnimplementedStrategyServiceServer
 	logger     *log.Logger
 	dataClient datapb.DataServiceClient
-}
-
-func parseAndFormatTimestamp(timestampStr string) (string, error) {
-	// Parse int64 from string
-	timestamp, err := strconv.ParseInt(timestampStr, 10, 64)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse timestamp: %w", err)
-	}
-
-	// Format the timestamp into a date string
-	date := time.Unix(timestamp, 0).Format("2006-01-02:15:04:05")
-	return date, nil
 }
 
 func NewServer(dataClient datapb.DataServiceClient) *Server {
@@ -52,20 +38,20 @@ func NewServer(dataClient datapb.DataServiceClient) *Server {
 }
 
 func (s *Server) GenerateSignals(ctx context.Context, req *pb.SignalRequest) (*pb.SignalResponse, error) {
-	startDate, err := parseAndFormatTimestamp(req.StartDate)
+	startTimestamp, err := utils.ParseAndFormatTimestamp(req.StartDate)
 	if err != nil {
 		s.logger.WithError(err).Error("Failed to parse start date")
 		return nil, fmt.Errorf("failed to parse start date: %v", err)
 	}
-	endDate, err := parseAndFormatTimestamp(req.EndDate)
+	endTimestamp, err := utils.ParseAndFormatTimestamp(req.EndDate)
 	if err != nil {
 		s.logger.WithError(err).Error("Failed to parse end date")
 		return nil, fmt.Errorf("failed to parse end date: %v", err)
 	}
 	s.logger.WithFields(log.Fields{
 		"symbols":  req.Symbols,
-		"start":    startDate,
-		"end":      endDate,
+		"start":    startTimestamp,
+		"end":      endTimestamp,
 		"interval": req.Interval,
 	}).Info("📧 Sending request to data service")
 
@@ -92,31 +78,37 @@ func (s *Server) GenerateSignals(ctx context.Context, req *pb.SignalRequest) (*p
 			s.logger.WithField("symbol", symbol).Info("❌ Stock disqualified due to recent large gap")
 			continue
 		}
-
-		// Momentum score is for ranking stocks
-		momentumScore := utils.CalculateMomentumScore(stockResp.DataPoints, 90)
-
-		// ATR is for position sizing
-		atr := utils.CalculateATR(stockResp.DataPoints, 20)
-		positionSize := utils.CalculatePositionSize(atr, 1000000) // Assuming $1M account value
-
-		// Latest Price and 100MA for signal generation
+		// Disqualify stsock if it is below 100MA
 		lastPrice := stockResp.DataPoints[len(stockResp.DataPoints)-1].Close
 		movingAverage := utils.CalculateMovingAverage(stockResp.DataPoints, 100)
-		signal := utils.GenerateSignal(momentumScore, lastPrice, movingAverage)
+		s.logger.WithField("last_price", lastPrice).Trace("🔢 Last price")
+		s.logger.WithField("moving_average", movingAverage).Trace("🔢 Moving average")
+		if lastPrice < utils.CalculateMovingAverage(stockResp.DataPoints, 100) {
+			s.logger.WithField("symbol", symbol).Info("❌ Stock disqualified due to being below 100MA")
+			continue
+		}
+
+		// Disqualify stock if momentum score is negative
+		momentumScore := utils.CalculateMomentumScore(stockResp.DataPoints, 90)
+		if momentumScore < 0 {
+			s.logger.WithField("symbol", symbol).Info("❌ Stock disqualified due to negative momentum score")
+			continue
+		}
+
+		// Calculate ATR and risk unit
+		atr := utils.CalculateATR(stockResp.DataPoints, 20)
+		riskUnit := utils.CalculateRiskUnit(atr, 0.001)
 
 		s.logger.WithField("momentum_score", momentumScore).Trace("🔢 Momentum score")
 		s.logger.WithField("atr", atr).Trace("🔢 ATR")
-		s.logger.WithField("position_size", positionSize).Trace("🔢 Position size")
-		s.logger.WithField("last_price", lastPrice).Trace("🔢 Last price")
-		s.logger.WithField("moving_average", movingAverage).Trace("🔢 Moving average")
-		s.logger.WithField("signal", signal).Trace("🔢 Signal")
+		s.logger.WithField("risk_unit", riskUnit).Trace("🔢 Risk Unit")
 
 		signals = append(signals, &pb.StockSignal{
 			Symbol:        symbol,
-			Signal:        signal,
-			PositionSize:  positionSize,
+			Signal:        pb.SignalType_BUY,
+			RiskUnit:      riskUnit,
 			MomentumScore: momentumScore,
+			CurrentPrice:  lastPrice,
 		})
 	}
 

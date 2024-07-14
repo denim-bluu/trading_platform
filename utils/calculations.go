@@ -41,10 +41,12 @@ func GenerateSignal(momentumScore float64, price float64, movingAverage float64)
 	return pb.SignalType_HOLD
 }
 
-// CalculatePositionSize calculates the position size based on ATR and account value
-func CalculatePositionSize(atr float64, accountValue float64) float64 {
-	riskPerTrade := 0.001 * accountValue // 0.1% risk per trade
-	return riskPerTrade / atr
+// CalculateRiskUnit calculates the position size based on ATR and account value
+func CalculateRiskUnit(atr, riskFactor float64) float64 {
+	return riskFactor / atr
+}
+func CalculatePositionSize(riskFactor, accountValue float64) int32 {
+	return int32(riskFactor * accountValue)
 }
 
 // CalculateATR calculates the Average True Range (ATR)

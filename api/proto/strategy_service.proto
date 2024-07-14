@@ -23,8 +23,9 @@ message SignalResponse {
 message StockSignal {
   string symbol = 1;
   SignalType signal = 2;
-  double position_size = 3;
+  double risk_unit = 3;
   double momentum_score = 4;
+  double current_price = 5;
 }
 
 enum SignalType {
