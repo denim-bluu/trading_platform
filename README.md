@@ -61,3 +61,24 @@ graph TD
     D -->|Provides signals| B
     E -->|Executes trades| F[Broker/Exchange]
 ```
+
+## Trading Process Summary
+
+1. Every Wednesday: Update Portfolio
+   - Check S&P 500 relative to its 200MA
+   - For existing positions:
+     - Sell if:
+       - No longer in top 20% of momentum-ranked stocks
+       - Fallen below its 100MA
+       - Received an explicit sell signal
+     - Adjust size if:
+       - Still in top 20% and above 100MA, but target position size has changed
+   - For new positions:
+     - Only open if S&P 500 is above its 200MA
+     - Buy stocks from the top 20% that aren't already in the portfolio
+
+2. Every Second Wednesday of the Month: Rebalance Portfolio
+   - Perform all actions from the weekly update
+   - Additionally:
+     - Rebalance all existing positions to their target sizes based on current risk factors
+     - This rebalancing occurs regardless of the S&P 500's position relative to its 200MA
