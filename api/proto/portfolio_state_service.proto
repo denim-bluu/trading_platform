@@ -1,0 +1,45 @@
+// api/proto/portfolio_state_service.proto
+syntax = "proto3";
+
+package portfoliostateservice;
+
+option go_package = "momentum-trading-platform/api/proto/portfolio_state_service";
+
+service PortfolioStateService {
+  rpc SavePortfolioState(PortfolioState) returns (SaveResponse) {}
+  rpc LoadPortfolioState(LoadRequest) returns (PortfolioState) {}
+  rpc GetPortfolioHistory(HistoryRequest) returns (PortfolioHistory) {}
+}
+
+message PortfolioState {
+  string date = 1;
+  repeated Position positions = 2;
+  double cash_balance = 3;
+  double total_value = 4;
+}
+
+message Position {
+  string symbol = 1;
+  int32 quantity = 2;
+  double average_price = 3;
+  double current_price = 4;
+  double market_value = 5;
+}
+
+message SaveResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message LoadRequest {
+  string date = 1;
+}
+
+message HistoryRequest {
+  string start_date = 1;
+  string end_date = 2;
+}
+
+message PortfolioHistory {
+  repeated PortfolioState states = 1;
+}

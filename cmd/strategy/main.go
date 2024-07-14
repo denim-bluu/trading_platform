@@ -10,7 +10,7 @@ import (
 
 	datapb "momentum-trading-platform/api/proto/data_service"
 	pb "momentum-trading-platform/api/proto/strategy_service"
-	"momentum-trading-platform/utils"
+	"momentum-trading-platform/internal/utils"
 
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"

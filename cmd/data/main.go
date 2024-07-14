@@ -12,7 +12,7 @@ import (
 	"time"
 
 	pb "momentum-trading-platform/api/proto/data_service"
-	"momentum-trading-platform/utils"
+	"momentum-trading-platform/internal/utils"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"

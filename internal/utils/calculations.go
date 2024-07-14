@@ -1,16 +1,25 @@
-// utils/calculations.go
 package utils
 
 import (
 	"math"
+	"time"
 
 	datapb "momentum-trading-platform/api/proto/data_service"
-	pb "momentum-trading-platform/api/proto/strategy_service"
+	stratpb "momentum-trading-platform/api/proto/strategy_service"
 
 	"gonum.org/v1/gonum/stat"
 )
 
-// CalculateMomentumScore calculates the momentum score using exponential regression
+func IsWednesday(date string) bool {
+	t, _ := time.Parse("2006-01-02", date)
+	return t.Weekday() == time.Wednesday
+}
+
+func IsSecondWednesdayOfMonth(date string) bool {
+	t, _ := time.Parse("2006-01-02", date)
+	return t.Weekday() == time.Wednesday && (t.Day()-1)/7 == 1
+}
+
 func CalculateMomentumScore(dataPoints []*datapb.StockDataPoint, period int) float64 {
 	if len(dataPoints) < period {
 		return 0
@@ -34,11 +43,11 @@ func CalculateMomentumScore(dataPoints []*datapb.StockDataPoint, period int) flo
 }
 
 // GenerateSignal generates a trading signal based on momentum score, price, and moving average
-func GenerateSignal(momentumScore float64, price float64, movingAverage float64) pb.SignalType {
+func GenerateSignal(momentumScore float64, price float64, movingAverage float64) stratpb.SignalType {
 	if momentumScore > 0 && price > movingAverage {
-		return pb.SignalType_BUY
+		return stratpb.SignalType_BUY
 	}
-	return pb.SignalType_HOLD
+	return stratpb.SignalType_HOLD
 }
 
 // CalculateRiskUnit calculates the position size based on ATR and account value

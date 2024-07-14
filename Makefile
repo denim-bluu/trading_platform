@@ -44,4 +44,4 @@ clean-proto:
 all: build up generate-proto
 
 # Phony targets to prevent conflicts with file names
-.PHONY: up down build start stop logs restart generate-proto clean-proto
+.PHONY: up down build start stop logs restart generate-proto clean-proto setup-db build-services run-portfolio-state-service run-portfolio-service run-portfolio-state-client
