@@ -8,13 +8,13 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strconv"
 	"sync"
 	"time"
 
 	pb "momentum-trading-platform/api/proto/data_service"
+	"momentum-trading-platform/utils"
 
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -50,16 +50,18 @@ type HTTPClient interface {
 
 type server struct {
 	pb.UnimplementedDataServiceServer
-	logger      *logrus.Logger
+	logger      *log.Logger
 	rateLimiter *rate.Limiter
 	httpClient  HTTPClient
 }
 
 func newServer() *server {
-	logger := logrus.New()
-	// logger.SetFormatter(&logrus.JSONFormatter{})
+	logger := log.New()
+	logger.SetLevel(log.TraceLevel)
+	logger.SetFormatter(&log.TextFormatter{
+		FullTimestamp: true,
+	})
 	logger.SetOutput(os.Stdout)
-
 	return &server{
 		logger:      logger,
 		rateLimiter: rate.NewLimiter(rate.Every(time.Second), 2),
@@ -68,20 +70,15 @@ func newServer() *server {
 }
 
 func (s *server) GetStockData(ctx context.Context, req *pb.StockRequest) (*pb.StockResponse, error) {
-	// Parse int64 from string
-	startTimestamp, _ := strconv.ParseInt(req.StartDate, 10, 64)
-	startDate := time.Unix(startTimestamp, 0).Format("2006-01-02:15:04:05")
-
-	endTimestamp, _ := strconv.ParseInt(req.EndDate, 10, 64)
-	endDate := time.Unix(endTimestamp, 0).Format("2006-01-02:15:04:05")
-	s.logger.WithFields(logrus.Fields{
+	startTimestamp, _ := utils.ParseAndFormatTimestamp(req.StartDate)
+	endTimestamp, _ := utils.ParseAndFormatTimestamp(req.EndDate)
+	s.logger.WithFields(log.Fields{
 		"symbol":   req.Symbol,
-		"start":    startDate,
-		"end":      endDate,
+		"start":    startTimestamp,
+		"end":      endTimestamp,
 		"interval": req.Interval,
 	}).Info("Received request for stock data")
 
-	// Apply rate limiting
 	if err := s.rateLimiter.Wait(ctx); err != nil {
 		s.logger.WithError(err).Error("Rate limit exceeded")
 		return nil, status.Errorf(codes.ResourceExhausted, "rate limit exceeded")
@@ -91,7 +88,7 @@ func (s *server) GetStockData(ctx context.Context, req *pb.StockRequest) (*pb.St
 }
 
 func (s *server) GetBatchStockData(ctx context.Context, req *pb.BatchStockRequest) (*pb.BatchStockResponse, error) {
-	s.logger.WithFields(logrus.Fields{
+	s.logger.WithFields(log.Fields{
 		"symbols":  req.Symbols,
 		"start":    req.StartDate,
 		"end":      req.EndDate,
@@ -187,7 +184,7 @@ func (s *server) fetchStockData(ctx context.Context, symbol, startDate, endDate,
 func main() {
 	s := newServer()
 
-	lis, err := net.Listen("tcp", getEnv("GRPC_ADDR", ":50051"))
+	lis, err := net.Listen("tcp", utils.GetEnv("GRPC_ADDR", ":50051"))
 	if err != nil {
 		s.logger.WithError(err).Fatal("Failed to listen")
 	}
@@ -199,11 +196,4 @@ func main() {
 	if err := grpcServer.Serve(lis); err != nil {
 		s.logger.WithError(err).Fatal("Failed to serve")
 	}
-}
-
-func getEnv(key, fallback string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
-	}
-	return fallback
 }
