@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/charmbracelet/log"
@@ -19,34 +20,60 @@ func main() {
 		log.Fatalf("did not connect: %v", err)
 	}
 	defer conn.Close()
-	client := pb.NewPortfolioServiceClient(conn)
+	c := pb.NewPortfolioServiceClient(conn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	// Get initial portfolio status
-	status, err := client.GetPortfolioStatus(ctx, &pb.PortfolioRequest{Date: time.Now().Format("2006-01-02")})
+	// Get current portfolio status
+	status, err := c.GetPortfolioStatus(ctx, &pb.PortfolioStatusRequest{})
 	if err != nil {
 		log.Fatalf("could not get portfolio status: %v", err)
 	}
-	log.Infof("Initial Portfolio Status: %+v\n", status)
+	printPortfolioStatus(status)
 
-	// Process some mock trading signals
-	update, err := client.ProcessTradingSignals(ctx, &pb.TradingSignals{
-		Signals: []*pb.Signal{
-			{Symbol: "AAPL", Type: pb.TradeType_BUY, PositionSize: 100000},
-			{Symbol: "GOOGL", Type: pb.TradeType_BUY, PositionSize: 100000},
-		},
-	})
-	if err != nil {
-		log.Fatalf("could not process trading signals: %v", err)
+	// Update portfolio
+	updateReq := &pb.UpdatePortfolioRequest{
+		Date: time.Now().Format("2006-01-02"),
 	}
-	log.Printf("Portfolio Update After Signals: %+v\n", update)
+	log.Info("Updating portfolio...")
+	updateResp, err := c.UpdatePortfolio(ctx, updateReq)
+	if err != nil {
+		log.Fatalf("could not update portfolio: %v", err)
+	}
+	printPortfolioUpdate(updateResp)
 
-	// Perform a rebalance
-	rebalanceUpdate, err := client.RebalancePortfolio(ctx, &pb.RebalanceRequest{Date: time.Now().Format("2006-01-02")})
-	if err != nil {
-		log.Fatalf("could not rebalance portfolio: %v", err)
+	// // Rebalance portfolio
+	// rebalanceReq := &pb.RebalanceRequest{
+	// 	Date: time.Now().Format("2006-01-02"),
+	// }
+	// rebalanceResp, err := c.RebalancePortfolio(ctx, rebalanceReq)
+	// if err != nil {
+	// 	log.Fatalf("could not rebalance portfolio: %v", err)
+	// }
+	// printPortfolioUpdate(rebalanceResp)
+}
+
+func printPortfolioStatus(status *pb.PortfolioStatus) {
+	fmt.Println("Portfolio Status:")
+	fmt.Printf("Cash Balance: $%.2f\n", status.CashBalance)
+	fmt.Printf("Total Value: $%.2f\n", status.TotalValue)
+	fmt.Printf("Last Update Date: %s\n", status.LastUpdateDate)
+	fmt.Println("Positions:")
+	for _, pos := range status.Positions {
+		fmt.Printf("  %s: %d shares, Avg Price: $%.2f, Current Price: $%.2f, Market Value: $%.2f\n",
+			pos.Symbol, pos.Quantity, pos.AveragePrice, pos.CurrentPrice, pos.MarketValue)
 	}
-	log.Printf("Portfolio Update After Rebalance: %+v\n", rebalanceUpdate)
+	fmt.Println()
+}
+
+func printPortfolioUpdate(update *pb.PortfolioUpdate) {
+	fmt.Println("Portfolio Update:")
+	fmt.Println("Trades:")
+	for _, trade := range update.Trades {
+		fmt.Printf("  %s %s: %d shares at $%.2f\n",
+			trade.Type, trade.Symbol, trade.Quantity, trade.Price)
+	}
+	fmt.Println("Updated Status:")
+	printPortfolioStatus(update.UpdatedStatus)
 }

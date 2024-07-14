@@ -21,17 +21,17 @@ import (
 const _ = grpc.SupportPackageIsVersion8
 
 const (
-	PortfolioService_GetPortfolioStatus_FullMethodName    = "/portfolioservice.PortfolioService/GetPortfolioStatus"
-	PortfolioService_ProcessTradingSignals_FullMethodName = "/portfolioservice.PortfolioService/ProcessTradingSignals"
-	PortfolioService_RebalancePortfolio_FullMethodName    = "/portfolioservice.PortfolioService/RebalancePortfolio"
+	PortfolioService_UpdatePortfolio_FullMethodName    = "/portfolioservice.PortfolioService/UpdatePortfolio"
+	PortfolioService_GetPortfolioStatus_FullMethodName = "/portfolioservice.PortfolioService/GetPortfolioStatus"
+	PortfolioService_RebalancePortfolio_FullMethodName = "/portfolioservice.PortfolioService/RebalancePortfolio"
 )
 
 // PortfolioServiceClient is the client API for PortfolioService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type PortfolioServiceClient interface {
-	GetPortfolioStatus(ctx context.Context, in *PortfolioRequest, opts ...grpc.CallOption) (*PortfolioStatus, error)
-	ProcessTradingSignals(ctx context.Context, in *TradingSignals, opts ...grpc.CallOption) (*PortfolioUpdate, error)
+	UpdatePortfolio(ctx context.Context, in *UpdatePortfolioRequest, opts ...grpc.CallOption) (*PortfolioUpdate, error)
+	GetPortfolioStatus(ctx context.Context, in *PortfolioStatusRequest, opts ...grpc.CallOption) (*PortfolioStatus, error)
 	RebalancePortfolio(ctx context.Context, in *RebalanceRequest, opts ...grpc.CallOption) (*PortfolioUpdate, error)
 }
 
@@ -43,20 +43,20 @@ func NewPortfolioServiceClient(cc grpc.ClientConnInterface) PortfolioServiceClie
 	return &portfolioServiceClient{cc}
 }
 
-func (c *portfolioServiceClient) GetPortfolioStatus(ctx context.Context, in *PortfolioRequest, opts ...grpc.CallOption) (*PortfolioStatus, error) {
+func (c *portfolioServiceClient) UpdatePortfolio(ctx context.Context, in *UpdatePortfolioRequest, opts ...grpc.CallOption) (*PortfolioUpdate, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(PortfolioStatus)
-	err := c.cc.Invoke(ctx, PortfolioService_GetPortfolioStatus_FullMethodName, in, out, cOpts...)
+	out := new(PortfolioUpdate)
+	err := c.cc.Invoke(ctx, PortfolioService_UpdatePortfolio_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *portfolioServiceClient) ProcessTradingSignals(ctx context.Context, in *TradingSignals, opts ...grpc.CallOption) (*PortfolioUpdate, error) {
+func (c *portfolioServiceClient) GetPortfolioStatus(ctx context.Context, in *PortfolioStatusRequest, opts ...grpc.CallOption) (*PortfolioStatus, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(PortfolioUpdate)
-	err := c.cc.Invoke(ctx, PortfolioService_ProcessTradingSignals_FullMethodName, in, out, cOpts...)
+	out := new(PortfolioStatus)
+	err := c.cc.Invoke(ctx, PortfolioService_GetPortfolioStatus_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -77,8 +77,8 @@ func (c *portfolioServiceClient) RebalancePortfolio(ctx context.Context, in *Reb
 // All implementations must embed UnimplementedPortfolioServiceServer
 // for forward compatibility
 type PortfolioServiceServer interface {
-	GetPortfolioStatus(context.Context, *PortfolioRequest) (*PortfolioStatus, error)
-	ProcessTradingSignals(context.Context, *TradingSignals) (*PortfolioUpdate, error)
+	UpdatePortfolio(context.Context, *UpdatePortfolioRequest) (*PortfolioUpdate, error)
+	GetPortfolioStatus(context.Context, *PortfolioStatusRequest) (*PortfolioStatus, error)
 	RebalancePortfolio(context.Context, *RebalanceRequest) (*PortfolioUpdate, error)
 	mustEmbedUnimplementedPortfolioServiceServer()
 }
@@ -87,11 +87,11 @@ type PortfolioServiceServer interface {
 type UnimplementedPortfolioServiceServer struct {
 }
 
-func (UnimplementedPortfolioServiceServer) GetPortfolioStatus(context.Context, *PortfolioRequest) (*PortfolioStatus, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetPortfolioStatus not implemented")
+func (UnimplementedPortfolioServiceServer) UpdatePortfolio(context.Context, *UpdatePortfolioRequest) (*PortfolioUpdate, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdatePortfolio not implemented")
 }
-func (UnimplementedPortfolioServiceServer) ProcessTradingSignals(context.Context, *TradingSignals) (*PortfolioUpdate, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ProcessTradingSignals not implemented")
+func (UnimplementedPortfolioServiceServer) GetPortfolioStatus(context.Context, *PortfolioStatusRequest) (*PortfolioStatus, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPortfolioStatus not implemented")
 }
 func (UnimplementedPortfolioServiceServer) RebalancePortfolio(context.Context, *RebalanceRequest) (*PortfolioUpdate, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RebalancePortfolio not implemented")
@@ -109,8 +109,26 @@ func RegisterPortfolioServiceServer(s grpc.ServiceRegistrar, srv PortfolioServic
 	s.RegisterService(&PortfolioService_ServiceDesc, srv)
 }
 
+func _PortfolioService_UpdatePortfolio_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdatePortfolioRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PortfolioServiceServer).UpdatePortfolio(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PortfolioService_UpdatePortfolio_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PortfolioServiceServer).UpdatePortfolio(ctx, req.(*UpdatePortfolioRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _PortfolioService_GetPortfolioStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PortfolioRequest)
+	in := new(PortfolioStatusRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -122,25 +140,7 @@ func _PortfolioService_GetPortfolioStatus_Handler(srv interface{}, ctx context.C
 		FullMethod: PortfolioService_GetPortfolioStatus_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PortfolioServiceServer).GetPortfolioStatus(ctx, req.(*PortfolioRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _PortfolioService_ProcessTradingSignals_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(TradingSignals)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(PortfolioServiceServer).ProcessTradingSignals(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: PortfolioService_ProcessTradingSignals_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PortfolioServiceServer).ProcessTradingSignals(ctx, req.(*TradingSignals))
+		return srv.(PortfolioServiceServer).GetPortfolioStatus(ctx, req.(*PortfolioStatusRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -171,12 +171,12 @@ var PortfolioService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*PortfolioServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "GetPortfolioStatus",
-			Handler:    _PortfolioService_GetPortfolioStatus_Handler,
+			MethodName: "UpdatePortfolio",
+			Handler:    _PortfolioService_UpdatePortfolio_Handler,
 		},
 		{
-			MethodName: "ProcessTradingSignals",
-			Handler:    _PortfolioService_ProcessTradingSignals_Handler,
+			MethodName: "GetPortfolioStatus",
+			Handler:    _PortfolioService_GetPortfolioStatus_Handler,
 		},
 		{
 			MethodName: "RebalancePortfolio",

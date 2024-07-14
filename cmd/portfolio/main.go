@@ -3,165 +3,304 @@ package main
 
 import (
 	"context"
-	"math/rand"
+	"fmt"
 	"net"
+	"os"
+	"time"
 
-	"github.com/charmbracelet/log"
-
+	datapb "momentum-trading-platform/api/proto/data_service"
 	pb "momentum-trading-platform/api/proto/portfolio_service"
+	strategypb "momentum-trading-platform/api/proto/strategy_service"
+	"momentum-trading-platform/utils"
 
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
 type server struct {
 	pb.UnimplementedPortfolioServiceServer
-	portfolio map[string]*pb.Position
-	cash      float64
+	logger         *log.Logger
+	dataClient     datapb.DataServiceClient
+	strategyClient strategypb.StrategyServiceClient
+	portfolio      map[string]*pb.Position
+	cashBalance    float64
+	lastUpdateDate string
 }
 
-func newServer() *server {
+func newServer(dataClient datapb.DataServiceClient, strategyClient strategypb.StrategyServiceClient) *server {
+	logger := log.New()
+	logger.SetLevel(log.TraceLevel)
+	logger.SetFormatter(&log.TextFormatter{
+		FullTimestamp: true,
+	})
+	logger.SetOutput(os.Stdout)
+
 	return &server{
-		portfolio: make(map[string]*pb.Position),
-		cash:      1000000,
+		logger:         logger,
+		dataClient:     dataClient,
+		strategyClient: strategyClient,
+		portfolio:      make(map[string]*pb.Position),
+		cashBalance:    1000000, // Starting with $1M cash
 	}
 }
 
-func (s *server) GetPortfolioStatus(ctx context.Context, req *pb.PortfolioRequest) (*pb.PortfolioStatus, error) {
-	positions := make([]*pb.Position, 0, len(s.portfolio))
-	totalValue := s.cash
+func (s *server) WeeklyRebalance(ctx context.Context, req *pb.RebalanceRequest) (*pb.PortfolioUpdate, error) {
+	s.logger.WithField("date", req.Date).Info("Performing weekly rebalance")
 
-	for _, pos := range s.portfolio {
-		positions = append(positions, pos)
-		totalValue += pos.MarketValue
+	if !isWednesday(req.Date) {
+		return nil, fmt.Errorf("weekly rebalance can only be performed on Wednesdays")
 	}
 
-	return &pb.PortfolioStatus{
-		Positions:   positions,
-		CashBalance: s.cash,
-		TotalValue:  totalValue,
+	isIndexPositive, err := s.isIndexInPositiveTrend(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check index trend: %v", err)
+	}
+
+	signals, err := s.getStrategySignals(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get strategy signals: %v", err)
+	}
+
+	var trades []*pb.Trade
+
+	// Sell positions that are no longer in the signals
+	for symbol := range s.portfolio {
+		if !s.isInSignals(symbol, signals.Signals) {
+			trade := s.sellPosition(symbol)
+			trades = append(trades, trade)
+		}
+	}
+
+	// Buy new positions or adjust existing ones if index is in positive trend
+	if isIndexPositive {
+		for _, signal := range signals.Signals {
+			if position, exists := s.portfolio[signal.Symbol]; exists {
+				trade := s.adjustPosition(signal, position)
+				if trade != nil {
+					trades = append(trades, trade)
+				}
+			} else if s.cashBalance > 0 {
+				trade := s.buyPosition(signal)
+				if trade != nil {
+					trades = append(trades, trade)
+				}
+			}
+		}
+	}
+
+	s.lastUpdateDate = req.Date
+
+	return &pb.PortfolioUpdate{
+		Trades:        trades,
+		UpdatedStatus: s.getPortfolioStatus(),
 	}, nil
 }
 
-func (s *server) ProcessTradingSignals(ctx context.Context, signals *pb.TradingSignals) (*pb.PortfolioUpdate, error) {
-	trades := make([]*pb.Trade, 0)
+func (s *server) BiWeeklyRebalance(ctx context.Context, req *pb.RebalanceRequest) (*pb.PortfolioUpdate, error) {
+	s.logger.WithField("date", req.Date).Info("Performing bi-weekly rebalance")
+
+	if !isSecondWednesdayOfMonth(req.Date) {
+		return nil, fmt.Errorf("bi-weekly rebalance can only be performed on the second Wednesday of the month")
+	}
+
+	// Perform the regular weekly rebalance
+	weeklyUpdate, err := s.WeeklyRebalance(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to perform weekly rebalance: %v", err)
+	}
+
+	// Then, adjust all position sizes
+	signals, err := s.getStrategySignals(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get strategy signals: %v", err)
+	}
+
+	var additionalTrades []*pb.Trade
 
 	for _, signal := range signals.Signals {
-		switch signal.Type {
-		case pb.TradeType_BUY:
-			trade := s.executeBuy(signal.Symbol, signal.PositionSize)
+		if position, exists := s.portfolio[signal.Symbol]; exists {
+			trade := s.adjustPosition(signal, position)
 			if trade != nil {
-				trades = append(trades, trade)
+				additionalTrades = append(additionalTrades, trade)
 			}
-			log.Infof("Buy signal for %s with position size %.2f", signal.Symbol, signal.PositionSize)
-		case pb.TradeType_SELL:
-			trade := s.executeSell(signal.Symbol)
-			if trade != nil {
-				trades = append(trades, trade)
-			}
-			log.Infof("Sell signal for %s", signal.Symbol)
 		}
 	}
 
-	status, _ := s.GetPortfolioStatus(ctx, &pb.PortfolioRequest{})
-	return &pb.PortfolioUpdate{
-		Trades:        trades,
-		UpdatedStatus: status,
-	}, nil
+	weeklyUpdate.Trades = append(weeklyUpdate.Trades, additionalTrades...)
+	weeklyUpdate.UpdatedStatus = s.getPortfolioStatus()
+
+	return weeklyUpdate, nil
 }
 
-func (s *server) executeBuy(symbol string, positionSize float64) *pb.Trade {
-	// Mock price between 100 and 200, this should be replaced with real data from Data Service
-	price := 100 + rand.Float64()*100
-
-	// Calculate quantity based on position size ($ terms) and price
-	quantity := int32(positionSize / price)
-
-	if quantity > 0 {
-		cost := float64(quantity) * price
-		if cost > s.cash {
-			quantity = int32(s.cash / price)
-			cost = float64(quantity) * price
-		}
-		s.cash -= cost
-
-		if pos, exists := s.portfolio[symbol]; exists {
-			pos.Quantity += quantity
-			pos.AveragePrice = (pos.AveragePrice*float64(pos.Quantity-quantity) + cost) / float64(pos.Quantity)
-			pos.CurrentPrice = price
-			pos.MarketValue = float64(pos.Quantity) * price
-		} else {
-			s.portfolio[symbol] = &pb.Position{
-				Symbol:       symbol,
-				Quantity:     quantity,
-				AveragePrice: price,
-				CurrentPrice: price,
-				MarketValue:  cost,
-			}
-		}
-		log.Infof("Bought %d shares of %s at %.2f", quantity, symbol, price)
-
-		return &pb.Trade{
-			Symbol:   symbol,
-			Type:     pb.TradeType_BUY,
-			Quantity: quantity,
-			Price:    price,
-		}
+func (s *server) sellPosition(symbol string) *pb.Trade {
+	position := s.portfolio[symbol]
+	trade := &pb.Trade{
+		Symbol:   symbol,
+		Type:     pb.TradeType_SELL,
+		Quantity: position.Quantity,
+		Price:    position.CurrentPrice,
 	}
-
-	return nil
+	s.cashBalance += float64(position.Quantity) * position.CurrentPrice
+	delete(s.portfolio, symbol)
+	return trade
 }
 
-func (s *server) executeSell(symbol string) *pb.Trade {
-	if pos, exists := s.portfolio[symbol]; exists {
-		price := pos.CurrentPrice * (1 + (rand.Float64()*0.1 - 0.05)) // Price +/- 5%
-		s.cash += float64(pos.Quantity) * price
-
-		trade := &pb.Trade{
-			Symbol:   symbol,
-			Type:     pb.TradeType_SELL,
-			Quantity: pos.Quantity,
-			Price:    price,
-		}
-
-		log.Infof("Sold %d shares of %s at %.2f", pos.Quantity, symbol, price)
-
-		delete(s.portfolio, symbol)
-		return trade
+func (s *server) buyPosition(signal *strategypb.StockSignal) *pb.Trade {
+	quantity := utils.CalculatePositionSize(signal.RiskUnit, signal.CurrentPrice)
+	cost := float64(quantity) * signal.CurrentPrice
+	if cost > s.cashBalance {
+		quantity = int32(s.cashBalance / signal.CurrentPrice)
+		cost = float64(quantity) * signal.CurrentPrice
 	}
-
-	return nil
+	if quantity == 0 {
+		return nil
+	}
+	trade := &pb.Trade{
+		Symbol:   signal.Symbol,
+		Type:     pb.TradeType_BUY,
+		Quantity: quantity,
+		Price:    signal.CurrentPrice,
+	}
+	s.portfolio[signal.Symbol] = &pb.Position{
+		Symbol:       signal.Symbol,
+		Quantity:     quantity,
+		AveragePrice: signal.CurrentPrice,
+		CurrentPrice: signal.CurrentPrice,
+		MarketValue:  cost,
+	}
+	s.cashBalance -= cost
+	return trade
 }
-func (s *server) RebalancePortfolio(ctx context.Context, req *pb.RebalanceRequest) (*pb.PortfolioUpdate, error) {
-	// Simplified rebalancing: sell 10% of each position
-	trades := make([]*pb.Trade, 0)
 
-	for symbol, pos := range s.portfolio {
-		sellQuantity := int32(float64(pos.Quantity) * 0.1)
-		if sellQuantity > 0 {
-			trade := s.executeSell(symbol)
-			if trade != nil {
-				trades = append(trades, trade)
-			}
+func (s *server) adjustPosition(signal *strategypb.StockSignal, position *pb.Position) *pb.Trade {
+	targetSize := utils.CalculatePositionSize(signal.RiskUnit, signal.CurrentPrice)
+	diff := targetSize - position.Quantity
+	if diff == 0 {
+		return nil
+	}
+	tradeType := pb.TradeType_BUY
+	if diff < 0 {
+		tradeType = pb.TradeType_SELL
+		diff = -diff
+	}
+	trade := &pb.Trade{
+		Symbol:   signal.Symbol,
+		Type:     tradeType,
+		Quantity: diff,
+		Price:    signal.CurrentPrice,
+	}
+	if tradeType == pb.TradeType_BUY {
+		position.Quantity += diff
+		s.cashBalance -= float64(diff) * signal.CurrentPrice
+	} else {
+		position.Quantity -= diff
+		s.cashBalance += float64(diff) * signal.CurrentPrice
+	}
+	position.CurrentPrice = signal.CurrentPrice
+	position.MarketValue = float64(position.Quantity) * signal.CurrentPrice
+	return trade
+}
+
+func (s *server) isInSignals(symbol string, signals []*strategypb.StockSignal) bool {
+	for _, signal := range signals {
+		if signal.Symbol == symbol {
+			return true
 		}
-		log.Infof("Rebalanced %s, sold %d shares", symbol, sellQuantity)
+	}
+	return false
+}
+
+func (s *server) getTotalPortfolioValue() float64 {
+	total := s.cashBalance
+	for _, position := range s.portfolio {
+		total += position.MarketValue
+	}
+	return total
+}
+
+func (s *server) getPortfolioStatus() *pb.PortfolioStatus {
+	positions := make([]*pb.Position, 0, len(s.portfolio))
+	for _, position := range s.portfolio {
+		positions = append(positions, position)
+	}
+	return &pb.PortfolioStatus{
+		Positions:      positions,
+		CashBalance:    s.cashBalance,
+		TotalValue:     s.getTotalPortfolioValue(),
+		LastUpdateDate: s.lastUpdateDate,
+	}
+}
+
+func (s *server) isIndexInPositiveTrend(ctx context.Context) (bool, error) {
+	resp, err := s.dataClient.GetStockData(ctx, &datapb.StockRequest{
+		Symbol:    "^GSPC", // S&P 500 index
+		StartDate: fmt.Sprintf("%d", time.Now().AddDate(0, 0, -200).Unix()),
+		EndDate:   fmt.Sprintf("%d", time.Now().Unix()),
+		Interval:  "1d",
+	})
+	if err != nil {
+		return false, err
 	}
 
-	status, _ := s.GetPortfolioStatus(ctx, &pb.PortfolioRequest{})
-	return &pb.PortfolioUpdate{
-		Trades:        trades,
-		UpdatedStatus: status,
-	}, nil
+	ma200 := utils.CalculateMovingAverage(resp.DataPoints, 200)
+	currentPrice := resp.DataPoints[len(resp.DataPoints)-1].Close
+	return currentPrice > ma200, nil
+}
+
+func (s *server) getStrategySignals(ctx context.Context) (*strategypb.SignalResponse, error) {
+	// Implementation to get signals from the strategy service
+	return s.strategyClient.GenerateSignals(ctx, &strategypb.SignalRequest{
+		Symbols:   s.getSymbolsToAnalyze(),
+		StartDate: time.Now().AddDate(0, 0, -90).Format("2006-01-02"),
+		EndDate:   time.Now().Format("2006-01-02"),
+		Interval:  "1d",
+	})
+}
+
+func (s *server) getSymbolsToAnalyze() []string {
+	// This should return all symbols in the S&P 500 index
+	// Placeholder implementation
+	return []string{"AAPL", "GOOGL", "MSFT", "AMZN", "FB"}
+}
+
+func isWednesday(date string) bool {
+	t, _ := time.Parse("2006-01-02", date)
+	return t.Weekday() == time.Wednesday
+}
+
+func isSecondWednesdayOfMonth(date string) bool {
+	t, _ := time.Parse("2006-01-02", date)
+	return t.Weekday() == time.Wednesday && (t.Day()-1)/7 == 1
 }
 
 func main() {
+	// Set up connections to the data and strategy services
+	dataConn, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("Failed to connect to data service: %v", err)
+	}
+	defer dataConn.Close()
+	dataClient := datapb.NewDataServiceClient(dataConn)
+
+	strategyConn, err := grpc.Dial("localhost:50052", grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("Failed to connect to strategy service: %v", err)
+	}
+	defer strategyConn.Close()
+	strategyClient := strategypb.NewStrategyServiceClient(strategyConn)
+
+	s := newServer(dataClient, strategyClient)
+
 	lis, err := net.Listen("tcp", ":50053")
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		s.logger.WithError(err).Fatal("Failed to listen")
 	}
-	s := grpc.NewServer()
-	pb.RegisterPortfolioServiceServer(s, newServer())
-	log.Printf("Portfolio service listening at %v", lis.Addr())
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+
+	grpcServer := grpc.NewServer()
+	pb.RegisterPortfolioServiceServer(grpcServer, s)
+
+	s.logger.WithField("address", lis.Addr().String()).Info("Portfolio service starting")
+	if err := grpcServer.Serve(lis); err != nil {
+		s.logger.WithError(err).Fatal("Failed to serve")
 	}
 }
