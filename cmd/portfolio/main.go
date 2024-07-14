@@ -6,15 +6,18 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
 	"time"
 
 	datapb "momentum-trading-platform/api/proto/data_service"
 	pb "momentum-trading-platform/api/proto/portfolio_service"
+	statepb "momentum-trading-platform/api/proto/portfolio_state_service"
 	strategypb "momentum-trading-platform/api/proto/strategy_service"
 	"momentum-trading-platform/utils"
 
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type server struct {
@@ -22,12 +25,14 @@ type server struct {
 	logger         *log.Logger
 	dataClient     datapb.DataServiceClient
 	strategyClient strategypb.StrategyServiceClient
+	stateClient    statepb.PortfolioStateServiceClient
 	portfolio      map[string]*pb.Position
 	cashBalance    float64
 	lastUpdateDate string
+	mu             sync.Mutex
 }
 
-func newServer(dataClient datapb.DataServiceClient, strategyClient strategypb.StrategyServiceClient) *server {
+func newServer(dataClient datapb.DataServiceClient, strategyClient strategypb.StrategyServiceClient, stateClient statepb.PortfolioStateServiceClient) *server {
 	logger := log.New()
 	logger.SetLevel(log.TraceLevel)
 	logger.SetFormatter(&log.TextFormatter{
@@ -35,17 +40,40 @@ func newServer(dataClient datapb.DataServiceClient, strategyClient strategypb.St
 	})
 	logger.SetOutput(os.Stdout)
 
-	return &server{
+	s := &server{
 		logger:         logger,
 		dataClient:     dataClient,
 		strategyClient: strategyClient,
+		stateClient:    stateClient,
 		portfolio:      make(map[string]*pb.Position),
-		cashBalance:    1000000, // Starting with $1M cash
+		lastUpdateDate: time.Now().Format("2006-01-02:15:04:05"),
 	}
+
+	// Load the last saved state
+	if err := s.loadLastState(); err != nil {
+		s.logger.WithError(err).Error("Failed to load last portfolio state")
+	}
+
+	return s
 }
 
+// Weekly Rebalance (WeeklyRebalance method):
+//
+//   - Occurs every Wednesday
+//
+//   - Steps:
+//     a. Check if the S&P 500 index is in a positive trend (above 200-day MA)
+//     b. Get signals from the Strategy Service
+//     c. Sell positions: Sell any position not present in the current signals
+//     d. If index is in a positive trend, for each signal:
+//     d.1. If it's an existing position: Adjust the position size
+//     d.2. If it's a new position: Buy it (if cash is available)
+//     d.3. Update the portfolio status
 func (s *server) WeeklyRebalance(ctx context.Context, req *pb.RebalanceRequest) (*pb.PortfolioUpdate, error) {
 	s.logger.WithField("date", req.Date).Info("Performing weekly rebalance")
+	if err := s.loadLastState(); err != nil {
+		return nil, fmt.Errorf("failed to load latest state before rebalance: %v", err)
+	}
 
 	if !isWednesday(req.Date) {
 		return nil, fmt.Errorf("weekly rebalance can only be performed on Wednesdays")
@@ -79,7 +107,7 @@ func (s *server) WeeklyRebalance(ctx context.Context, req *pb.RebalanceRequest) 
 				if trade != nil {
 					trades = append(trades, trade)
 				}
-			} else if s.cashBalance > 0 {
+			} else if s.getPortfolioStatus().GetCashBalance() > 0 {
 				trade := s.buyPosition(signal)
 				if trade != nil {
 					trades = append(trades, trade)
@@ -89,6 +117,9 @@ func (s *server) WeeklyRebalance(ctx context.Context, req *pb.RebalanceRequest) 
 	}
 
 	s.lastUpdateDate = req.Date
+	if err := s.saveState(); err != nil {
+		return nil, fmt.Errorf("failed to save state after rebalance: %v", err)
+	}
 
 	return &pb.PortfolioUpdate{
 		Trades:        trades,
@@ -96,8 +127,20 @@ func (s *server) WeeklyRebalance(ctx context.Context, req *pb.RebalanceRequest) 
 	}, nil
 }
 
+// BiWeekly Rebalance:
+//
+//   - Occurs on the second Wednesday of each month
+//
+//   - Steps:
+//     a. Perform the regular weekly rebalance
+//     b. Get fresh signals from the strategy service
+//     c. For all current positions, adjust position sizes based on the new signals
+//     d. Update the portfolio status
 func (s *server) BiWeeklyRebalance(ctx context.Context, req *pb.RebalanceRequest) (*pb.PortfolioUpdate, error) {
 	s.logger.WithField("date", req.Date).Info("Performing bi-weekly rebalance")
+	if err := s.loadLastState(); err != nil {
+		return nil, fmt.Errorf("failed to load latest state before rebalance: %v", err)
+	}
 
 	if !isSecondWednesdayOfMonth(req.Date) {
 		return nil, fmt.Errorf("bi-weekly rebalance can only be performed on the second Wednesday of the month")
@@ -128,6 +171,10 @@ func (s *server) BiWeeklyRebalance(ctx context.Context, req *pb.RebalanceRequest
 
 	weeklyUpdate.Trades = append(weeklyUpdate.Trades, additionalTrades...)
 	weeklyUpdate.UpdatedStatus = s.getPortfolioStatus()
+
+	if err := s.saveState(); err != nil {
+		return nil, fmt.Errorf("failed to save state after rebalance: %v", err)
+	}
 
 	return weeklyUpdate, nil
 }
@@ -273,23 +320,94 @@ func isSecondWednesdayOfMonth(date string) bool {
 	return t.Weekday() == time.Wednesday && (t.Day()-1)/7 == 1
 }
 
+func (s *server) convertStatePositions(positions []*statepb.Position) map[string]*pb.Position {
+	portfolio := make(map[string]*pb.Position)
+	for _, pos := range positions {
+		portfolio[pos.Symbol] = &pb.Position{
+			Symbol:       pos.Symbol,
+			Quantity:     pos.Quantity,
+			AveragePrice: pos.AveragePrice,
+			CurrentPrice: pos.CurrentPrice,
+			MarketValue:  pos.MarketValue,
+		}
+	}
+	return portfolio
+}
+
+func (s *server) loadLastState() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	lastState, err := s.stateClient.LoadPortfolioState(ctx, &statepb.LoadRequest{
+		Date: time.Now().Format("2006-01-02"), // Or the last known date
+	})
+	if err != nil {
+		return fmt.Errorf("failed to load last portfolio state: %v", err)
+	}
+	s.logger.Infof("Loaded last portfolio state: %s", lastState.Date)
+
+	s.portfolio = s.convertStatePositions(lastState.Positions)
+	s.cashBalance = lastState.CashBalance
+	s.lastUpdateDate = lastState.Date
+
+	return nil
+}
+
+func (s *server) saveState() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	positions := make([]*statepb.Position, 0, len(s.portfolio))
+	for _, pos := range s.portfolio {
+		positions = append(positions, &statepb.Position{
+			Symbol:       pos.Symbol,
+			Quantity:     pos.Quantity,
+			AveragePrice: pos.AveragePrice,
+			CurrentPrice: pos.CurrentPrice,
+			MarketValue:  pos.MarketValue,
+		})
+	}
+
+	_, err := s.stateClient.SavePortfolioState(ctx, &statepb.PortfolioState{
+		Date:        time.Now().Format("2006-01-02"),
+		Positions:   positions,
+		CashBalance: s.cashBalance,
+		TotalValue:  s.getTotalPortfolioValue(),
+	})
+
+	return err
+}
+
 func main() {
 	// Set up connections to the data and strategy services
-	dataConn, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
+	dataConn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("Failed to connect to data service: %v", err)
 	}
 	defer dataConn.Close()
 	dataClient := datapb.NewDataServiceClient(dataConn)
 
-	strategyConn, err := grpc.Dial("localhost:50052", grpc.WithInsecure())
+	strategyConn, err := grpc.NewClient("localhost:50052", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("Failed to connect to strategy service: %v", err)
 	}
 	defer strategyConn.Close()
 	strategyClient := strategypb.NewStrategyServiceClient(strategyConn)
 
-	s := newServer(dataClient, strategyClient)
+	stateConn, err := grpc.NewClient("localhost:50055", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("Failed to connect to strategy service: %v", err)
+	}
+	defer strategyConn.Close()
+	stateClient := statepb.NewPortfolioStateServiceClient(stateConn)
+
+	s := newServer(dataClient, strategyClient, stateClient)
 
 	lis, err := net.Listen("tcp", ":50053")
 	if err != nil {
