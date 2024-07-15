@@ -1,12 +1,14 @@
 package portfolio
 
 import (
+	"context"
 	pb "momentum-trading-platform/api/proto/portfolio_service"
 	strategypb "momentum-trading-platform/api/proto/strategy_service"
 	"momentum-trading-platform/internal/utils"
 )
 
 func (s *Server) sellPosition(symbol string) *pb.Trade {
+	s.Logger.WithField("symbol", symbol).Info("Selling position")
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -19,6 +21,10 @@ func (s *Server) sellPosition(symbol string) *pb.Trade {
 	}
 	s.CashBalance += float64(position.Quantity) * position.CurrentPrice
 	delete(s.Portfolio, symbol)
+
+	if err := s.Storage.SaveTrade(context.Background(), trade); err != nil {
+		s.Logger.WithError(err).Error("Failed to save trade")
+	}
 	return trade
 }
 
@@ -26,8 +32,9 @@ func (s *Server) buyPosition(signal *strategypb.StockSignal) *pb.Trade {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	quantity := utils.CalculatePositionSize(signal.RiskUnit, signal.CurrentPrice)
+	quantity := utils.CalculatePositionSize(signal.RiskUnit, s.CashBalance)
 	cost := float64(quantity) * signal.CurrentPrice
+	s.Logger.Infof("Buying %d shares of %s at $%.2f", quantity, signal.Symbol, signal.CurrentPrice)
 	if cost > s.CashBalance {
 		quantity = int32(s.CashBalance / signal.CurrentPrice)
 		cost = float64(quantity) * signal.CurrentPrice
@@ -49,10 +56,17 @@ func (s *Server) buyPosition(signal *strategypb.StockSignal) *pb.Trade {
 		MarketValue:  cost,
 	}
 	s.CashBalance -= cost
+
+	s.Logger.WithField("Trade", trade).Info("Trade executed")
+
+	if err := s.Storage.SaveTrade(context.Background(), trade); err != nil {
+		s.Logger.WithError(err).Error("Failed to save trade")
+	}
 	return trade
 }
 
 func (s *Server) adjustPosition(signal *strategypb.StockSignal, position *pb.Position) *pb.Trade {
+	s.Logger.WithField("symbol", signal.Symbol).Info("Adjusting position")
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

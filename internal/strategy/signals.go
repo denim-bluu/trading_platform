@@ -47,6 +47,14 @@ func (s *Server) fetchBatchStockData(ctx context.Context, req *pb.SignalRequest)
 		s.Logger.WithError(err).Error("Failed to fetch batch stock data")
 		return nil, fmt.Errorf("failed to fetch stock data: %v", err)
 	}
+	if batchResp.Errors != nil {
+		for symbol, errMsg := range batchResp.Errors {
+			s.Logger.WithFields(log.Fields{
+				"symbol": symbol,
+				"error":  errMsg,
+			}).Warn("Failed to fetch stock data")
+		}
+	}
 	s.Logger.Info("✅ Received batch stock data")
 	return batchResp, nil
 }

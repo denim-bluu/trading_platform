@@ -11,11 +11,12 @@ import (
 	pb "momentum-trading-platform/api/proto/portfolio_service"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
 	// Set up a connection to the server.
-	conn, err := grpc.Dial("localhost:50053", grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.NewClient("localhost:50053", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}

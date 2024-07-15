@@ -24,7 +24,7 @@
    - Sort and return signals for the top-ranked stocks
    - Logging of strategy calculations and decisions
 
-3. TODO: Portfolio Service:
+3. Portfolio Service:
    - Manages the current portfolio composition
    - Handles position sizing and risk management
    - Performs weekly portfolio rebalancing

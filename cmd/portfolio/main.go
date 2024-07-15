@@ -5,6 +5,7 @@ import (
 	"net"
 
 	"momentum-trading-platform/internal/portfolio"
+	"momentum-trading-platform/internal/storage"
 
 	pb "momentum-trading-platform/api/proto/portfolio_service"
 
@@ -18,7 +19,8 @@ func main() {
 	}
 	defer clients.Close()
 
-	s := portfolio.NewServer(clients)
+	csvStorage := storage.NewCSVStorage("portfolio.csv", "trades.csv")
+	s := portfolio.NewServer(clients, csvStorage)
 
 	lis, err := net.Listen("tcp", ":50053")
 	if err != nil {

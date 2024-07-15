@@ -25,9 +25,6 @@ import (
 //     d.3. Update the portfolio status
 func (s *Server) WeeklyRebalance(ctx context.Context, req *pb.RebalanceRequest) (*pb.PortfolioUpdate, error) {
 	s.Logger.WithField("date", req.Date).Info("Performing weekly rebalance")
-	if err := s.loadLastState(); err != nil {
-		return nil, fmt.Errorf("failed to load latest state before rebalance: %v", err)
-	}
 
 	if !utils.IsWednesday(req.Date) {
 		// return nil, fmt.Errorf("weekly rebalance can only be performed on Wednesdays")
@@ -71,8 +68,9 @@ func (s *Server) WeeklyRebalance(ctx context.Context, req *pb.RebalanceRequest) 
 	}
 
 	s.LastUpdateDate = req.Date
-	if err := s.saveState(); err != nil {
-		return nil, fmt.Errorf("failed to save state after rebalance: %v", err)
+
+	if err := s.Storage.SavePortfolioState(ctx, s.getPortfolioStatus()); err != nil {
+		s.Logger.WithError(err).Error("Failed to save portfolio state")
 	}
 
 	return &pb.PortfolioUpdate{
@@ -92,9 +90,6 @@ func (s *Server) WeeklyRebalance(ctx context.Context, req *pb.RebalanceRequest) 
 //     d. Update the portfolio status
 func (s *Server) BiWeeklyRebalance(ctx context.Context, req *pb.RebalanceRequest) (*pb.PortfolioUpdate, error) {
 	s.Logger.WithField("date", req.Date).Info("Performing bi-weekly rebalance")
-	if err := s.loadLastState(); err != nil {
-		return nil, fmt.Errorf("failed to load latest state before rebalance: %v", err)
-	}
 
 	if !utils.IsSecondWednesdayOfMonth(req.Date) {
 		// return nil, fmt.Errorf("bi-weekly rebalance can only be performed on the second Wednesday of the month")
@@ -126,10 +121,9 @@ func (s *Server) BiWeeklyRebalance(ctx context.Context, req *pb.RebalanceRequest
 	weeklyUpdate.Trades = append(weeklyUpdate.Trades, additionalTrades...)
 	weeklyUpdate.UpdatedStatus = s.getPortfolioStatus()
 
-	if err := s.saveState(); err != nil {
-		return nil, fmt.Errorf("failed to save state after rebalance: %v", err)
+	if err := s.Storage.SavePortfolioState(ctx, s.getPortfolioStatus()); err != nil {
+		s.Logger.WithError(err).Error("Failed to save portfolio state")
 	}
-
 	return weeklyUpdate, nil
 }
 
