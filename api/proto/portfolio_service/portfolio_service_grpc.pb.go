@@ -21,18 +21,18 @@ import (
 const _ = grpc.SupportPackageIsVersion8
 
 const (
-	PortfolioService_UpdatePortfolio_FullMethodName    = "/portfolioservice.PortfolioService/UpdatePortfolio"
+	PortfolioService_WeeklyRebalance_FullMethodName    = "/portfolioservice.PortfolioService/WeeklyRebalance"
+	PortfolioService_BiWeeklyRebalance_FullMethodName  = "/portfolioservice.PortfolioService/BiWeeklyRebalance"
 	PortfolioService_GetPortfolioStatus_FullMethodName = "/portfolioservice.PortfolioService/GetPortfolioStatus"
-	PortfolioService_RebalancePortfolio_FullMethodName = "/portfolioservice.PortfolioService/RebalancePortfolio"
 )
 
 // PortfolioServiceClient is the client API for PortfolioService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type PortfolioServiceClient interface {
-	UpdatePortfolio(ctx context.Context, in *UpdatePortfolioRequest, opts ...grpc.CallOption) (*PortfolioUpdate, error)
+	WeeklyRebalance(ctx context.Context, in *RebalanceRequest, opts ...grpc.CallOption) (*PortfolioUpdate, error)
+	BiWeeklyRebalance(ctx context.Context, in *RebalanceRequest, opts ...grpc.CallOption) (*PortfolioUpdate, error)
 	GetPortfolioStatus(ctx context.Context, in *PortfolioStatusRequest, opts ...grpc.CallOption) (*PortfolioStatus, error)
-	RebalancePortfolio(ctx context.Context, in *RebalanceRequest, opts ...grpc.CallOption) (*PortfolioUpdate, error)
 }
 
 type portfolioServiceClient struct {
@@ -43,10 +43,20 @@ func NewPortfolioServiceClient(cc grpc.ClientConnInterface) PortfolioServiceClie
 	return &portfolioServiceClient{cc}
 }
 
-func (c *portfolioServiceClient) UpdatePortfolio(ctx context.Context, in *UpdatePortfolioRequest, opts ...grpc.CallOption) (*PortfolioUpdate, error) {
+func (c *portfolioServiceClient) WeeklyRebalance(ctx context.Context, in *RebalanceRequest, opts ...grpc.CallOption) (*PortfolioUpdate, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(PortfolioUpdate)
-	err := c.cc.Invoke(ctx, PortfolioService_UpdatePortfolio_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, PortfolioService_WeeklyRebalance_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *portfolioServiceClient) BiWeeklyRebalance(ctx context.Context, in *RebalanceRequest, opts ...grpc.CallOption) (*PortfolioUpdate, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PortfolioUpdate)
+	err := c.cc.Invoke(ctx, PortfolioService_BiWeeklyRebalance_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -63,23 +73,13 @@ func (c *portfolioServiceClient) GetPortfolioStatus(ctx context.Context, in *Por
 	return out, nil
 }
 
-func (c *portfolioServiceClient) RebalancePortfolio(ctx context.Context, in *RebalanceRequest, opts ...grpc.CallOption) (*PortfolioUpdate, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(PortfolioUpdate)
-	err := c.cc.Invoke(ctx, PortfolioService_RebalancePortfolio_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // PortfolioServiceServer is the server API for PortfolioService service.
 // All implementations must embed UnimplementedPortfolioServiceServer
 // for forward compatibility
 type PortfolioServiceServer interface {
-	UpdatePortfolio(context.Context, *UpdatePortfolioRequest) (*PortfolioUpdate, error)
+	WeeklyRebalance(context.Context, *RebalanceRequest) (*PortfolioUpdate, error)
+	BiWeeklyRebalance(context.Context, *RebalanceRequest) (*PortfolioUpdate, error)
 	GetPortfolioStatus(context.Context, *PortfolioStatusRequest) (*PortfolioStatus, error)
-	RebalancePortfolio(context.Context, *RebalanceRequest) (*PortfolioUpdate, error)
 	mustEmbedUnimplementedPortfolioServiceServer()
 }
 
@@ -87,14 +87,14 @@ type PortfolioServiceServer interface {
 type UnimplementedPortfolioServiceServer struct {
 }
 
-func (UnimplementedPortfolioServiceServer) UpdatePortfolio(context.Context, *UpdatePortfolioRequest) (*PortfolioUpdate, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UpdatePortfolio not implemented")
+func (UnimplementedPortfolioServiceServer) WeeklyRebalance(context.Context, *RebalanceRequest) (*PortfolioUpdate, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method WeeklyRebalance not implemented")
+}
+func (UnimplementedPortfolioServiceServer) BiWeeklyRebalance(context.Context, *RebalanceRequest) (*PortfolioUpdate, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BiWeeklyRebalance not implemented")
 }
 func (UnimplementedPortfolioServiceServer) GetPortfolioStatus(context.Context, *PortfolioStatusRequest) (*PortfolioStatus, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPortfolioStatus not implemented")
-}
-func (UnimplementedPortfolioServiceServer) RebalancePortfolio(context.Context, *RebalanceRequest) (*PortfolioUpdate, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RebalancePortfolio not implemented")
 }
 func (UnimplementedPortfolioServiceServer) mustEmbedUnimplementedPortfolioServiceServer() {}
 
@@ -109,20 +109,38 @@ func RegisterPortfolioServiceServer(s grpc.ServiceRegistrar, srv PortfolioServic
 	s.RegisterService(&PortfolioService_ServiceDesc, srv)
 }
 
-func _PortfolioService_UpdatePortfolio_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UpdatePortfolioRequest)
+func _PortfolioService_WeeklyRebalance_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RebalanceRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PortfolioServiceServer).UpdatePortfolio(ctx, in)
+		return srv.(PortfolioServiceServer).WeeklyRebalance(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: PortfolioService_UpdatePortfolio_FullMethodName,
+		FullMethod: PortfolioService_WeeklyRebalance_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PortfolioServiceServer).UpdatePortfolio(ctx, req.(*UpdatePortfolioRequest))
+		return srv.(PortfolioServiceServer).WeeklyRebalance(ctx, req.(*RebalanceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PortfolioService_BiWeeklyRebalance_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RebalanceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PortfolioServiceServer).BiWeeklyRebalance(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PortfolioService_BiWeeklyRebalance_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PortfolioServiceServer).BiWeeklyRebalance(ctx, req.(*RebalanceRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -145,24 +163,6 @@ func _PortfolioService_GetPortfolioStatus_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
-func _PortfolioService_RebalancePortfolio_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RebalanceRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(PortfolioServiceServer).RebalancePortfolio(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: PortfolioService_RebalancePortfolio_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PortfolioServiceServer).RebalancePortfolio(ctx, req.(*RebalanceRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // PortfolioService_ServiceDesc is the grpc.ServiceDesc for PortfolioService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -171,16 +171,16 @@ var PortfolioService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*PortfolioServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "UpdatePortfolio",
-			Handler:    _PortfolioService_UpdatePortfolio_Handler,
+			MethodName: "WeeklyRebalance",
+			Handler:    _PortfolioService_WeeklyRebalance_Handler,
+		},
+		{
+			MethodName: "BiWeeklyRebalance",
+			Handler:    _PortfolioService_BiWeeklyRebalance_Handler,
 		},
 		{
 			MethodName: "GetPortfolioStatus",
 			Handler:    _PortfolioService_GetPortfolioStatus_Handler,
-		},
-		{
-			MethodName: "RebalancePortfolio",
-			Handler:    _PortfolioService_RebalancePortfolio_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

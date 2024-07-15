@@ -41,4 +41,5 @@ message BatchStockRequest {
 
 message BatchStockResponse {
   map<string, StockResponse> stock_data = 1;
+  map<string, string> errors = 2;
 }

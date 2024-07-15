@@ -30,7 +30,7 @@ func (s *Server) WeeklyRebalance(ctx context.Context, req *pb.RebalanceRequest) 
 	}
 
 	if !utils.IsWednesday(req.Date) {
-		return nil, fmt.Errorf("weekly rebalance can only be performed on Wednesdays")
+		// return nil, fmt.Errorf("weekly rebalance can only be performed on Wednesdays")
 	}
 
 	isIndexPositive, err := s.isIndexInPositiveTrend(ctx)
@@ -97,7 +97,7 @@ func (s *Server) BiWeeklyRebalance(ctx context.Context, req *pb.RebalanceRequest
 	}
 
 	if !utils.IsSecondWednesdayOfMonth(req.Date) {
-		return nil, fmt.Errorf("bi-weekly rebalance can only be performed on the second Wednesday of the month")
+		// return nil, fmt.Errorf("bi-weekly rebalance can only be performed on the second Wednesday of the month")
 	}
 
 	// Perform the regular weekly rebalance
@@ -136,8 +136,8 @@ func (s *Server) BiWeeklyRebalance(ctx context.Context, req *pb.RebalanceRequest
 func (s *Server) isIndexInPositiveTrend(ctx context.Context) (bool, error) {
 	resp, err := s.Clients.DataClient.GetStockData(ctx, &datapb.StockRequest{
 		Symbol:    "^GSPC", // S&P 500 index
-		StartDate: fmt.Sprintf("%d", time.Now().AddDate(0, 0, -200).Unix()),
-		EndDate:   fmt.Sprintf("%d", time.Now().Unix()),
+		StartDate: time.Now().AddDate(0, 0, -200).Format("2006-01-02"),
+		EndDate:   time.Now().Format("2006-01-02"),
 		Interval:  "1d",
 	})
 	if err != nil {

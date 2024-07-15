@@ -3,7 +3,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/charmbracelet/log"
@@ -26,8 +25,8 @@ func main() {
 	defer cancel()
 
 	symbol := "AAPL"
-	startDate := fmt.Sprintf("%d", time.Now().AddDate(0, -1, 0).Unix()) // 1 month ago
-	endDate := fmt.Sprintf("%d", time.Now().Unix())
+	startDate := time.Now().AddDate(0, -1, 0).Format("2006-01-02")
+	endDate := time.Now().Format("2006-01-02")
 	interval := "1d"
 
 	r, err := c.GetStockData(ctx, &pb.StockRequest{Symbol: symbol, StartDate: startDate, EndDate: endDate, Interval: interval})
@@ -42,7 +41,9 @@ func main() {
 			dp.Open, dp.High, dp.Low, dp.Close, dp.AdjustedClose, dp.Volume)
 	}
 
-	rs, err := c.GetBatchStockData(ctx, &pb.BatchStockRequest{Symbols: []string{"AAPL", "GOOGL"}, StartDate: startDate, EndDate: endDate, Interval: interval})
+	rs, err := c.GetBatchStockData(ctx, &pb.BatchStockRequest{Symbols: []string{"AAPL", "GOOGL", "MSFT", "AMZN", "TSLA", "NVDA", "NFLX", "PYPL", "ADBE",
+		"INTC", "CSCO", "CMCSA", "PEP", "AVGO", "TXN", "COST", "QCOM", "TMUS", "AMGN", "SBUX",
+		"INTU", "AMD", "ISRG", "GILD", "MDLZ", "BKNG", "MU", "ADP", "REGN", "ATVI"}, StartDate: startDate, EndDate: endDate, Interval: interval})
 	if err != nil {
 		log.Fatalf("could not get batch stock data: %v", err)
 	}

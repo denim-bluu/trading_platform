@@ -1,6 +1,7 @@
 package portfolio
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -37,6 +38,10 @@ func NewServer(clients *Clients) *Server {
 	}
 
 	return s
+}
+
+func (s *Server) GetPortfolioStatus(ctx context.Context, req *pb.PortfolioStatusRequest) (*pb.PortfolioStatus, error) {
+	return s.getPortfolioStatus(), nil
 }
 
 func (s *Server) getPortfolioStatus() *pb.PortfolioStatus {

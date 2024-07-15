@@ -3,7 +3,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/charmbracelet/log"
@@ -25,9 +24,11 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 	defer cancel()
 
-	symbols := []string{"AAPL", "GOOGL", "MSFT", "AMZN", "TSLA", "NVDA", "PYPL", "INTC", "NFLX", "ADBE"}
-	startDate := fmt.Sprintf("%d", time.Now().AddDate(-1, 0, 0).Unix())
-	endDate := fmt.Sprintf("%d", time.Now().Unix())
+	symbols := []string{"AAPL", "GOOGL", "MSFT", "AMZN", "TSLA", "NVDA", "NFLX", "PYPL", "ADBE",
+		"INTC", "CSCO", "CMCSA", "PEP", "AVGO", "TXN", "COST", "QCOM", "TMUS", "AMGN", "SBUX",
+		"INTU", "AMD", "ISRG", "GILD", "MDLZ", "BKNG", "MU", "ADP", "REGN", "ATVI"}
+	startDate := time.Now().AddDate(-1, 0, 0).Format("2006-01-02")
+	endDate := time.Now().Format("2006-01-02")
 	interval := "1d"
 
 	req := &pb.SignalRequest{
@@ -42,9 +43,10 @@ func main() {
 		log.Fatalf("could not generate signals: %v", err)
 	}
 
+	log.Infof("Generated %d signals\n", len(resp.Signals))
 	log.Print("Generated Signals:")
 	for _, signal := range resp.Signals {
-		log.Printf("Symbol: %s, Signal: %s, Risk Unit: %.2f, Momentum Score: %.4f, Last Close: %.2f\n",
+		log.Infof("Symbol: %s, Signal: %s, Risk Unit: %.4f, Momentum Score: %.4f, Last Close: %.2f\n",
 			signal.Symbol, signal.Signal, signal.RiskUnit, signal.MomentumScore, signal.CurrentPrice)
 	}
 }

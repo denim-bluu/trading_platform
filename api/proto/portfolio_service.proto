@@ -6,12 +6,12 @@ package portfolioservice;
 option go_package = "momentum-trading-platform/api/proto/portfolio_service";
 
 service PortfolioService {
-  rpc UpdatePortfolio(UpdatePortfolioRequest) returns (PortfolioUpdate) {}
+  rpc WeeklyRebalance(RebalanceRequest) returns (PortfolioUpdate) {}
+  rpc BiWeeklyRebalance(RebalanceRequest) returns (PortfolioUpdate) {}
   rpc GetPortfolioStatus(PortfolioStatusRequest) returns (PortfolioStatus) {}
-  rpc RebalancePortfolio(RebalanceRequest) returns (PortfolioUpdate) {}
 }
 
-message UpdatePortfolioRequest {
+message RebalanceRequest {
   string date = 1;
 }
 
@@ -47,8 +47,4 @@ message Position {
   double average_price = 3;
   double current_price = 4;
   double market_value = 5;
-}
-
-message RebalanceRequest {
-  string date = 1;
 }
