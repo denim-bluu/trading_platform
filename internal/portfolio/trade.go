@@ -22,7 +22,7 @@ func (s *Server) sellPosition(symbol string) *pb.Trade {
 	s.CashBalance += float64(position.Quantity) * position.CurrentPrice
 	delete(s.Portfolio, symbol)
 
-	if err := s.Storage.SaveTrade(context.Background(), trade); err != nil {
+	if err := s.Storage.SaveTrade(context.Background(), trade, s.CashBalance); err != nil {
 		s.Logger.WithError(err).Error("Failed to save trade")
 	}
 	return trade
@@ -59,7 +59,7 @@ func (s *Server) buyPosition(signal *strategypb.StockSignal) *pb.Trade {
 
 	s.Logger.WithField("Trade", trade).Info("Trade executed")
 
-	if err := s.Storage.SaveTrade(context.Background(), trade); err != nil {
+	if err := s.Storage.SaveTrade(context.Background(), trade, s.CashBalance); err != nil {
 		s.Logger.WithError(err).Error("Failed to save trade")
 	}
 	return trade
@@ -70,7 +70,7 @@ func (s *Server) adjustPosition(signal *strategypb.StockSignal, position *pb.Pos
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	targetSize := utils.CalculatePositionSize(signal.RiskUnit, signal.CurrentPrice)
+	targetSize := utils.CalculatePositionSize(signal.RiskUnit, s.CashBalance)
 	diff := targetSize - position.Quantity
 	if diff == 0 {
 		return nil
@@ -95,5 +95,9 @@ func (s *Server) adjustPosition(signal *strategypb.StockSignal, position *pb.Pos
 	}
 	position.CurrentPrice = signal.CurrentPrice
 	position.MarketValue = float64(position.Quantity) * signal.CurrentPrice
+
+	if err := s.Storage.SaveTrade(context.Background(), trade, s.CashBalance); err != nil {
+		s.Logger.WithError(err).Error("Failed to save trade")
+	}
 	return trade
 }
