@@ -69,8 +69,8 @@ func (s *Server) WeeklyRebalance(ctx context.Context, req *pb.RebalanceRequest) 
 
 	s.LastUpdateDate = req.Date
 
-	if err := s.Storage.SavePortfolioState(ctx, s.getPortfolioStatus()); err != nil {
-		s.Logger.WithError(err).Error("Failed to save portfolio state")
+	if err := s.Storage.SavePortfolioState(ctx, s.getPortfolioStatus(), true); err != nil {
+		s.Logger.WithError(err).Error("Failed to save portfolio state snapshot")
 	}
 
 	return &pb.PortfolioUpdate{
@@ -121,8 +121,8 @@ func (s *Server) BiWeeklyRebalance(ctx context.Context, req *pb.RebalanceRequest
 	weeklyUpdate.Trades = append(weeklyUpdate.Trades, additionalTrades...)
 	weeklyUpdate.UpdatedStatus = s.getPortfolioStatus()
 
-	if err := s.Storage.SavePortfolioState(ctx, s.getPortfolioStatus()); err != nil {
-		s.Logger.WithError(err).Error("Failed to save portfolio state")
+	if err := s.Storage.SavePortfolioState(ctx, s.getPortfolioStatus(), true); err != nil {
+		s.Logger.WithError(err).Error("Failed to save portfolio state snapshot")
 	}
 	return weeklyUpdate, nil
 }

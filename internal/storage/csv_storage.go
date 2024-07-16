@@ -11,8 +11,6 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
 	pb "momentum-trading-platform/api/proto/portfolio_service"
 )
 
@@ -29,52 +27,43 @@ func NewCSVStorage(portfolioFile, tradeFile string) *CSVStorage {
 	}
 }
 
-func (s *CSVStorage) SavePortfolioState(ctx context.Context, state *pb.PortfolioStatus) error {
-	log.Infof("Saving portfolio state: %v", state)
+func (s *CSVStorage) SavePortfolioState(ctx context.Context, state *pb.PortfolioStatus, isSnapshot bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	file, err := os.Create(s.portfolioFile)
+	file, err := os.OpenFile(s.portfolioFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to create portfolio file: %v", err)
+		return fmt.Errorf("failed to open portfolio file: %v", err)
 	}
 	defer file.Close()
 
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
-	// Write header
-	if err := writer.Write([]string{"Symbol", "Quantity", "AveragePrice", "CurrentPrice", "MarketValue"}); err != nil {
-		return fmt.Errorf("failed to write header: %v", err)
-	}
-
-	// Write positions
+	timestamp := time.Now().Format(time.RFC3339)
+	totalValue := state.CashBalance
 	for _, position := range state.Positions {
+		totalValue += position.MarketValue
 		record := []string{
+			timestamp,
+			strconv.FormatBool(isSnapshot),
 			position.Symbol,
 			strconv.FormatInt(int64(position.Quantity), 10),
 			strconv.FormatFloat(position.AveragePrice, 'f', 2, 64),
 			strconv.FormatFloat(position.CurrentPrice, 'f', 2, 64),
 			strconv.FormatFloat(position.MarketValue, 'f', 2, 64),
+			strconv.FormatFloat(state.CashBalance, 'f', 2, 64),
+			strconv.FormatFloat(totalValue, 'f', 2, 64),
 		}
 		if err := writer.Write(record); err != nil {
-			return fmt.Errorf("failed to write position: %v", err)
+			return fmt.Errorf("failed to write portfolio state: %v", err)
 		}
-	}
-
-	// Write cash balance and last update date
-	if err := writer.Write([]string{"CashBalance", strconv.FormatFloat(state.CashBalance, 'f', 2, 64)}); err != nil {
-		return fmt.Errorf("failed to write cash balance: %v", err)
-	}
-	if err := writer.Write([]string{"LastUpdateDate", state.LastUpdateDate}); err != nil {
-		return fmt.Errorf("failed to write last update date: %v", err)
 	}
 
 	return nil
 }
 
 func (s *CSVStorage) LoadPortfolioState(ctx context.Context) (*pb.PortfolioStatus, error) {
-	log.Info("Loading portfolio state")
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -90,27 +79,36 @@ func (s *CSVStorage) LoadPortfolioState(ctx context.Context) (*pb.PortfolioStatu
 		return nil, fmt.Errorf("failed to read portfolio file: %v", err)
 	}
 
-	state := &pb.PortfolioStatus{}
-	for i, record := range records {
-		if i == 0 {
-			continue // Skip header
+	if len(records) == 0 {
+		return &pb.PortfolioStatus{}, nil
+	}
+
+	// Get the latest snapshot
+	var latestSnapshot []string
+	for i := len(records) - 1; i >= 0; i-- {
+		if records[i][1] == "true" { // IsSnapshot
+			latestSnapshot = records[i]
+			break
 		}
-		if len(record) == 2 {
-			// Cash balance or last update date
-			switch record[0] {
-			case "CashBalance":
-				state.CashBalance, _ = strconv.ParseFloat(record[1], 64)
-			case "LastUpdateDate":
-				state.LastUpdateDate = record[1]
-			}
-		} else if len(record) == 5 {
-			// Position
-			quantity, _ := strconv.ParseInt(record[1], 10, 32)
-			averagePrice, _ := strconv.ParseFloat(record[2], 64)
-			currentPrice, _ := strconv.ParseFloat(record[3], 64)
-			marketValue, _ := strconv.ParseFloat(record[4], 64)
+	}
+
+	if latestSnapshot == nil {
+		return &pb.PortfolioStatus{}, nil
+	}
+
+	state := &pb.PortfolioStatus{}
+	state.CashBalance, _ = strconv.ParseFloat(latestSnapshot[7], 64)
+	state.LastUpdateDate = latestSnapshot[0]
+
+	// Reconstruct positions from the snapshot
+	for _, record := range records {
+		if record[0] == latestSnapshot[0] && record[1] == "true" {
+			quantity, _ := strconv.ParseInt(record[3], 10, 32)
+			averagePrice, _ := strconv.ParseFloat(record[4], 64)
+			currentPrice, _ := strconv.ParseFloat(record[5], 64)
+			marketValue, _ := strconv.ParseFloat(record[6], 64)
 			position := &pb.Position{
-				Symbol:       record[0],
+				Symbol:       record[2],
 				Quantity:     int32(quantity),
 				AveragePrice: averagePrice,
 				CurrentPrice: currentPrice,
@@ -123,8 +121,7 @@ func (s *CSVStorage) LoadPortfolioState(ctx context.Context) (*pb.PortfolioStatu
 	return state, nil
 }
 
-func (s *CSVStorage) SaveTrade(ctx context.Context, trade *pb.Trade) error {
-	log.Infof("Saving trade: %v", trade)
+func (s *CSVStorage) SaveTrade(ctx context.Context, trade *pb.Trade, cashBalanceAfter float64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -143,6 +140,7 @@ func (s *CSVStorage) SaveTrade(ctx context.Context, trade *pb.Trade) error {
 		trade.Type.String(),
 		strconv.FormatInt(int64(trade.Quantity), 10),
 		strconv.FormatFloat(trade.Price, 'f', 2, 64),
+		strconv.FormatFloat(cashBalanceAfter, 'f', 2, 64),
 	}
 
 	if err := writer.Write(record); err != nil {
@@ -153,7 +151,6 @@ func (s *CSVStorage) SaveTrade(ctx context.Context, trade *pb.Trade) error {
 }
 
 func (s *CSVStorage) GetTradeHistory(ctx context.Context, startDate, endDate string) ([]*pb.Trade, error) {
-	log.Infof("Getting trade history between %s and %s", startDate, endDate)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
