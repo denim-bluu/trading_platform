@@ -2,6 +2,7 @@
 
 # Project-specific variables
 DOCKER_COMPOSE_FILE=deployments/docker-compose.yml
+DOCKER_COMPOSE_DB_FILE=deployments/docker-compose.db.yml
 
 # Target to bring up the Docker Compose services
 up:
@@ -38,6 +39,14 @@ generate-proto:
 # Optional: add a target to clean the generated files
 clean-proto:
 	rm -rf api/proto/*
+
+# Initiate PostgreSQL database
+setup-db:
+	docker-compose -f $(DOCKER_COMPOSE_DB_FILE) up -d
+
+# Destroy PostgreSQL database
+destroy-db:
+	docker-compose -f $(DOCKER_COMPOSE_DB_FILE) down -v
 
 # Default target
 .PHONY: all

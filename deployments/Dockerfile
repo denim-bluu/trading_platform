@@ -26,8 +26,14 @@ WORKDIR /root/
 # Copy the Pre-built binary file from the previous stage
 COPY --from=builder /app/service .
 
+# Copy the .env file
+COPY deployments/.env .
+
+# Install the 'env' command
+RUN apk add --no-cache gettext
+
 # Expose port 50051 to the outside world
 EXPOSE 50051
 
-# Command to run the executable
-CMD ["./service"]
+# Use env to load environment variables and run the service
+CMD ["/bin/sh", "-c", "env $(cat .env | xargs) ./service"]

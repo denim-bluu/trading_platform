@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=${DB_USER:-trading_platform}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-0000}
+      - POSTGRES_DB=${DB_NAME:-data}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT:-5432}:5432"
+
+volumes:
+  postgres_data:
