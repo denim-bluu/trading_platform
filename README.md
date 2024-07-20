@@ -5,11 +5,11 @@
 1. ✅ Data Service:
 
    - Fetch historical stock data from external sources (e.g., Yahoo Finance API)
+      - Store the response into Postgres database for future retrieval
+      - Store the response into Cache (In-memory) for faster retrieval
    - Provide both single stock and batch stock data retrieval
    - Return OHLC (Open, High, Low, Close) price data, adjusted close prices, and volume
    - Handle date range and interval specifications in requests
-   - Implement rate limiting to respect external API usage policies
-   - TODO: Implement caching to reduce repeated API calls
 
 2. ✅ Momentum Strategy Service:
 
