@@ -9,6 +9,25 @@ services:
         - SERVICE_NAME=data
     ports:
       - "50051:50051"
+    environment:
+      - DB_HOST=localhost
+      - DB_USER=trading_platform
+      - DB_PASSWORD=0000
+      - DB_NAME=data
+      - DB_PORT=5432
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=${DB_USER:-trading_platform}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-0000}
+      - POSTGRES_DB=${DB_NAME:-data}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
 
   strategy_service:
     build:
@@ -55,6 +74,8 @@ services:
     depends_on:
       - data_service
       - strategy_service
+volumes:
+  postgres_data:
 
 networks:
   default:

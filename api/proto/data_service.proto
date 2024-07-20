@@ -8,6 +8,16 @@ option go_package = "momentum-trading-platform/api/proto/data_service";
 service DataService {
   rpc GetStockData(StockRequest) returns (StockResponse) {}
   rpc GetBatchStockData(BatchStockRequest) returns (BatchStockResponse) {}
+  rpc UpdateLatestData(UpdateLatestDataRequest) returns (UpdateLatestDataResponse) {}
+}
+
+message UpdateLatestDataRequest {
+  repeated string symbols = 1;
+}
+
+message UpdateLatestDataResponse {
+  bool success = 1;
+  string message = 2;
 }
 
 message StockRequest {

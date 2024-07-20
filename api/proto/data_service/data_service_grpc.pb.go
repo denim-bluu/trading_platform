@@ -23,6 +23,7 @@ const _ = grpc.SupportPackageIsVersion8
 const (
 	DataService_GetStockData_FullMethodName      = "/dataservice.DataService/GetStockData"
 	DataService_GetBatchStockData_FullMethodName = "/dataservice.DataService/GetBatchStockData"
+	DataService_UpdateLatestData_FullMethodName  = "/dataservice.DataService/UpdateLatestData"
 )
 
 // DataServiceClient is the client API for DataService service.
@@ -31,6 +32,7 @@ const (
 type DataServiceClient interface {
 	GetStockData(ctx context.Context, in *StockRequest, opts ...grpc.CallOption) (*StockResponse, error)
 	GetBatchStockData(ctx context.Context, in *BatchStockRequest, opts ...grpc.CallOption) (*BatchStockResponse, error)
+	UpdateLatestData(ctx context.Context, in *UpdateLatestDataRequest, opts ...grpc.CallOption) (*UpdateLatestDataResponse, error)
 }
 
 type dataServiceClient struct {
@@ -61,12 +63,23 @@ func (c *dataServiceClient) GetBatchStockData(ctx context.Context, in *BatchStoc
 	return out, nil
 }
 
+func (c *dataServiceClient) UpdateLatestData(ctx context.Context, in *UpdateLatestDataRequest, opts ...grpc.CallOption) (*UpdateLatestDataResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateLatestDataResponse)
+	err := c.cc.Invoke(ctx, DataService_UpdateLatestData_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DataServiceServer is the server API for DataService service.
 // All implementations must embed UnimplementedDataServiceServer
 // for forward compatibility
 type DataServiceServer interface {
 	GetStockData(context.Context, *StockRequest) (*StockResponse, error)
 	GetBatchStockData(context.Context, *BatchStockRequest) (*BatchStockResponse, error)
+	UpdateLatestData(context.Context, *UpdateLatestDataRequest) (*UpdateLatestDataResponse, error)
 	mustEmbedUnimplementedDataServiceServer()
 }
 
@@ -79,6 +92,9 @@ func (UnimplementedDataServiceServer) GetStockData(context.Context, *StockReques
 }
 func (UnimplementedDataServiceServer) GetBatchStockData(context.Context, *BatchStockRequest) (*BatchStockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetBatchStockData not implemented")
+}
+func (UnimplementedDataServiceServer) UpdateLatestData(context.Context, *UpdateLatestDataRequest) (*UpdateLatestDataResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateLatestData not implemented")
 }
 func (UnimplementedDataServiceServer) mustEmbedUnimplementedDataServiceServer() {}
 
@@ -129,6 +145,24 @@ func _DataService_GetBatchStockData_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DataService_UpdateLatestData_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateLatestDataRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DataServiceServer).UpdateLatestData(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DataService_UpdateLatestData_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DataServiceServer).UpdateLatestData(ctx, req.(*UpdateLatestDataRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DataService_ServiceDesc is the grpc.ServiceDesc for DataService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -143,6 +177,10 @@ var DataService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetBatchStockData",
 			Handler:    _DataService_GetBatchStockData_Handler,
+		},
+		{
+			MethodName: "UpdateLatestData",
+			Handler:    _DataService_UpdateLatestData_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

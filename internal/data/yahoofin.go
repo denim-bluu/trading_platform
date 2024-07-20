@@ -5,13 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sync"
-	"time"
 
 	pb "momentum-trading-platform/api/proto/data_service"
 	"momentum-trading-platform/internal/utils"
 
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -37,54 +34,6 @@ type yahooFinanceResponse struct {
 			} `json:"indicators"`
 		} `json:"result"`
 	} `json:"chart"`
-}
-
-func (s *Server) GetStockData(ctx context.Context, req *pb.StockRequest) (*pb.StockResponse, error) {
-	s.Logger.WithFields(log.Fields{
-		"symbol":     req.Symbol,
-		"start_date": req.StartDate,
-		"end_date":   req.EndDate,
-		"interval":   req.Interval,
-	}).Info("Received request for stock data")
-
-	return s.fetchStockData(ctx, req.Symbol, req.StartDate, req.EndDate, req.Interval)
-}
-
-func (s *Server) GetBatchStockData(ctx context.Context, req *pb.BatchStockRequest) (*pb.BatchStockResponse, error) {
-	s.Logger.WithFields(log.Fields{
-		"symbols":    req.Symbols,
-		"start_date": req.StartDate,
-		"end_date":   req.EndDate,
-		"interval":   req.Interval,
-	}).Info("Received request for batch stock data")
-
-	responses := make(map[string]*pb.StockResponse)
-	errors := make(map[string]string)
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	for _, symbol := range req.Symbols {
-		wg.Add(1)
-		go func(sym string) {
-			defer wg.Done()
-			time.Sleep(time.Millisecond * 100)
-			resp, err := s.fetchStockData(ctx, sym, req.StartDate, req.EndDate, req.Interval)
-			mu.Lock()
-			defer mu.Unlock()
-			if err != nil {
-				s.Logger.WithError(err).WithField("symbol", sym).Error("Failed to fetch stock data")
-				errors[sym] = err.Error()
-			} else {
-				responses[sym] = resp
-			}
-		}(symbol)
-	}
-
-	wg.Wait()
-
-	return &pb.BatchStockResponse{
-		StockData: responses,
-		Errors:    errors,
-	}, nil
 }
 
 func (s *Server) fetchStockData(ctx context.Context, symbol, startDate, endDate, interval string) (*pb.StockResponse, error) {
