@@ -21,7 +21,9 @@ import (
 const _ = grpc.SupportPackageIsVersion8
 
 const (
-	StrategyService_GenerateSignals_FullMethodName = "/strategyservice.StrategyService/GenerateSignals"
+	StrategyService_GenerateSignals_FullMethodName       = "/strategyservice.StrategyService/GenerateSignals"
+	StrategyService_ConfigureStrategy_FullMethodName     = "/strategyservice.StrategyService/ConfigureStrategy"
+	StrategyService_GetStrategyParameters_FullMethodName = "/strategyservice.StrategyService/GetStrategyParameters"
 )
 
 // StrategyServiceClient is the client API for StrategyService service.
@@ -29,6 +31,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type StrategyServiceClient interface {
 	GenerateSignals(ctx context.Context, in *SignalRequest, opts ...grpc.CallOption) (*SignalResponse, error)
+	ConfigureStrategy(ctx context.Context, in *ConfigureStrategyRequest, opts ...grpc.CallOption) (*ConfigureStrategyResponse, error)
+	GetStrategyParameters(ctx context.Context, in *GetStrategyParametersRequest, opts ...grpc.CallOption) (*GetStrategyParametersResponse, error)
 }
 
 type strategyServiceClient struct {
@@ -49,11 +53,33 @@ func (c *strategyServiceClient) GenerateSignals(ctx context.Context, in *SignalR
 	return out, nil
 }
 
+func (c *strategyServiceClient) ConfigureStrategy(ctx context.Context, in *ConfigureStrategyRequest, opts ...grpc.CallOption) (*ConfigureStrategyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ConfigureStrategyResponse)
+	err := c.cc.Invoke(ctx, StrategyService_ConfigureStrategy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *strategyServiceClient) GetStrategyParameters(ctx context.Context, in *GetStrategyParametersRequest, opts ...grpc.CallOption) (*GetStrategyParametersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetStrategyParametersResponse)
+	err := c.cc.Invoke(ctx, StrategyService_GetStrategyParameters_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // StrategyServiceServer is the server API for StrategyService service.
 // All implementations must embed UnimplementedStrategyServiceServer
 // for forward compatibility
 type StrategyServiceServer interface {
 	GenerateSignals(context.Context, *SignalRequest) (*SignalResponse, error)
+	ConfigureStrategy(context.Context, *ConfigureStrategyRequest) (*ConfigureStrategyResponse, error)
+	GetStrategyParameters(context.Context, *GetStrategyParametersRequest) (*GetStrategyParametersResponse, error)
 	mustEmbedUnimplementedStrategyServiceServer()
 }
 
@@ -63,6 +89,12 @@ type UnimplementedStrategyServiceServer struct {
 
 func (UnimplementedStrategyServiceServer) GenerateSignals(context.Context, *SignalRequest) (*SignalResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GenerateSignals not implemented")
+}
+func (UnimplementedStrategyServiceServer) ConfigureStrategy(context.Context, *ConfigureStrategyRequest) (*ConfigureStrategyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ConfigureStrategy not implemented")
+}
+func (UnimplementedStrategyServiceServer) GetStrategyParameters(context.Context, *GetStrategyParametersRequest) (*GetStrategyParametersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetStrategyParameters not implemented")
 }
 func (UnimplementedStrategyServiceServer) mustEmbedUnimplementedStrategyServiceServer() {}
 
@@ -95,6 +127,42 @@ func _StrategyService_GenerateSignals_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _StrategyService_ConfigureStrategy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ConfigureStrategyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StrategyServiceServer).ConfigureStrategy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: StrategyService_ConfigureStrategy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StrategyServiceServer).ConfigureStrategy(ctx, req.(*ConfigureStrategyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _StrategyService_GetStrategyParameters_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetStrategyParametersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StrategyServiceServer).GetStrategyParameters(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: StrategyService_GetStrategyParameters_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StrategyServiceServer).GetStrategyParameters(ctx, req.(*GetStrategyParametersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // StrategyService_ServiceDesc is the grpc.ServiceDesc for StrategyService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -105,6 +173,14 @@ var StrategyService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GenerateSignals",
 			Handler:    _StrategyService_GenerateSignals_Handler,
+		},
+		{
+			MethodName: "ConfigureStrategy",
+			Handler:    _StrategyService_ConfigureStrategy_Handler,
+		},
+		{
+			MethodName: "GetStrategyParameters",
+			Handler:    _StrategyService_GetStrategyParameters_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

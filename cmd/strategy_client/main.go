@@ -32,10 +32,11 @@ func main() {
 	interval := "1d"
 
 	req := &pb.SignalRequest{
-		Symbols:   symbols,
-		StartDate: startDate,
-		EndDate:   endDate,
-		Interval:  interval,
+		Symbols:     symbols,
+		StartDate:   startDate,
+		EndDate:     endDate,
+		Interval:    interval,
+		MarketIndex: "^GSPC",
 	}
 
 	resp, err := c.GenerateSignals(ctx, req)

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   data_service:
     build:
@@ -10,7 +8,7 @@ services:
     ports:
       - "50051:50051"
     environment:
-      - DB_HOST=localhost
+      - DB_HOST=postgres
       - DB_USER=trading_platform
       - DB_PASSWORD=0000
       - DB_NAME=data
@@ -40,17 +38,17 @@ services:
     depends_on:
       - data_service
 
-  portfolio_service:
-    build:
-      context: ..
-      dockerfile: deployments/Dockerfile
-      args:
-        - SERVICE_NAME=portfolio
-    ports:
-      - "50053:50053"
-    depends_on:
-      - data_service
-      - strategy_service
+  # portfolio_service:
+  #   build:
+  #     context: ..
+  #     dockerfile: deployments/Dockerfile
+  #     args:
+  #       - SERVICE_NAME=portfolio
+  #   ports:
+  #     - "50053:50053"
+  #   depends_on:
+  #     - data_service
+  #     - strategy_service
 
   # trade_service:
   #   build:
@@ -63,17 +61,17 @@ services:
   #   depends_on:
   #     - portfolio_service
 
-  backtesting_service:
-    build:
-      context: ..
-      dockerfile: deployments/Dockerfile
-      args:
-        - SERVICE_NAME=backtesting
-    ports:
-      - "50055:50055"
-    depends_on:
-      - data_service
-      - strategy_service
+  # backtesting_service:
+  #   build:
+  #     context: ..
+  #     dockerfile: deployments/Dockerfile
+  #     args:
+  #       - SERVICE_NAME=backtesting
+  #   ports:
+  #     - "50055:50055"
+  #   depends_on:
+  #     - data_service
+  #     - strategy_service
 volumes:
   postgres_data:
 

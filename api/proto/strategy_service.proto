@@ -7,6 +7,8 @@ option go_package = "momentum-trading-platform/api/proto/strategy_service";
 
 service StrategyService {
   rpc GenerateSignals(SignalRequest) returns (SignalResponse) {}
+  rpc ConfigureStrategy(ConfigureStrategyRequest) returns (ConfigureStrategyResponse) {}
+  rpc GetStrategyParameters(GetStrategyParametersRequest) returns (GetStrategyParametersResponse) {}
 }
 
 message SignalRequest {
@@ -14,6 +16,7 @@ message SignalRequest {
   string start_date = 2;
   string end_date = 3;
   string interval = 4;  // 1d, 1wk, 1mo
+  string market_index = 5;
 }
 
 message SignalResponse {
@@ -32,4 +35,22 @@ enum SignalType {
   HOLD = 0;
   BUY = 1;
   SELL = 2;
+}
+
+message ConfigureStrategyRequest {
+  string strategy_name = 1;
+  map<string, string> parameters = 2;
+}
+
+message ConfigureStrategyResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message GetStrategyParametersRequest {
+  string strategy_name = 1;
+}
+
+message GetStrategyParametersResponse {
+  map<string, string> parameters = 1;
 }

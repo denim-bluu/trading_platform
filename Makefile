@@ -48,9 +48,14 @@ setup-db:
 destroy-db:
 	docker-compose -f $(DOCKER_COMPOSE_DB_FILE) down -v
 
+# To run the data-service
+run-data-service:
+	docker-compose -f $(DOCKER_COMPOSE_FILE) up data_service -d
+
+
 # Default target
 .PHONY: all
 all: build up generate-proto
 
 # Phony targets to prevent conflicts with file names
-.PHONY: up down build start stop logs restart generate-proto clean-proto setup-db build-services run-portfolio-state-service run-portfolio-service run-portfolio-state-client
+.PHONY: up down build start stop logs restart generate-proto clean-proto setup-db destroy-db

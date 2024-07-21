@@ -22,7 +22,6 @@
    - Calculate position sizes based on ATR for risk parity
    - Provide a batch processing capability for multiple stocks
    - Sort and return signals for the top-ranked stocks
-   - Logging of strategy calculations and decisions
 
 3. Portfolio Service:
    - Manages the current portfolio composition
