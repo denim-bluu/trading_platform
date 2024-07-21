@@ -9,6 +9,7 @@ import (
 	pb "momentum-trading-platform/api/proto/strategy_service"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 func main() {
@@ -27,6 +28,7 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterStrategyServiceServer(grpcServer, s)
+	reflection.Register(grpcServer)
 
 	s.Logger.WithField("address", lis.Addr().String()).Info("Strategy service starting")
 	if err := grpcServer.Serve(lis); err != nil {

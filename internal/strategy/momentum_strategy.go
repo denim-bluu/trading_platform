@@ -11,18 +11,18 @@ import (
 
 // MomentumStrategy defines the structure of the momentum trading strategy.
 type MomentumStrategy struct {
-	lookbackPeriod int
-	topPercentage  float64
-	riskFactor     float64
-	ma200Period    int // Period for calculating 200-day moving average
+	lookbackPeriod     int
+	topPercentage      float64
+	riskFactor         float64
+	marketRegimePeriod int // Period for calculating 200-day moving average
 }
 
 func NewMomentumStrategy() *MomentumStrategy {
 	return &MomentumStrategy{
-		lookbackPeriod: 90,
-		topPercentage:  0.2,
-		riskFactor:     0.001,
-		ma200Period:    200,
+		lookbackPeriod:     90,
+		topPercentage:      0.2,
+		riskFactor:         0.001,
+		marketRegimePeriod: 200,
 	}
 }
 
@@ -51,14 +51,9 @@ func (s *MomentumStrategy) generateSignal(symbol string, stockResp *datapb.Stock
 	momentumScore := utils.CalculateMomentumScore(stockResp.DataPoints, s.lookbackPeriod)
 	riskUnit := s.CalculateRisk(stockResp)
 
+	// Disqualified stocks are not traded
 	if s.isStockDisqualified(stockResp) {
-		return &pb.StockSignal{
-			Symbol:        symbol,
-			Signal:        pb.SignalType_SELL,
-			RiskUnit:      -999, // Set to -999 to indicate that the stock is disqualified, and clear all positions
-			MomentumScore: momentumScore,
-			CurrentPrice:  lastPrice,
-		}
+		return &pb.StockSignal{}
 	}
 
 	return &pb.StockSignal{
@@ -74,19 +69,19 @@ func (s *MomentumStrategy) generateSignal(symbol string, stockResp *datapb.Stock
 func (s *MomentumStrategy) isStockDisqualified(stockResp *datapb.StockResponse) bool {
 	// Implementation similar to the current isStockDisqualified function
 	if utils.HasRecentLargeGap(stockResp.DataPoints, 90, 0.15) {
-		log.WithField("symbol", stockResp.Symbol).Info("❌ Stock disqualified due to recent large gap")
+		log.WithField("symbol", stockResp.Symbol).Info("🗑️ Stock disqualified due to recent large gap")
 		return true
 	}
 	lastPrice := stockResp.DataPoints[len(stockResp.DataPoints)-1].Close
 	movingAverage := utils.CalculateMovingAverage(stockResp.DataPoints, 100)
 	if lastPrice < movingAverage {
-		log.WithField("symbol", stockResp.Symbol).Info("❌ Stock disqualified due to being below 100MA")
+		log.WithField("symbol", stockResp.Symbol).Info("🗑️ Stock disqualified due to being below 100MA")
 		return true
 	}
 
 	momentumScore := utils.CalculateMomentumScore(stockResp.DataPoints, 90)
 	if momentumScore < 0 {
-		log.WithField("symbol", stockResp.Symbol).Info("❌ Stock disqualified due to negative momentum score")
+		log.WithField("symbol", stockResp.Symbol).Info("🗑️ Stock disqualified due to negative momentum score")
 		return true
 	}
 
@@ -99,6 +94,7 @@ func (s *MomentumStrategy) sortAndFilterSignals(signals []*pb.StockSignal) []*pb
 	})
 
 	topCount := int(float64(len(signals)) * s.topPercentage)
+	log.Infof("🔍 Found %d stocks, selecting top %d based on momentum score", len(signals), topCount)
 	return signals[:topCount]
 }
 
@@ -114,7 +110,7 @@ func (s *MomentumStrategy) DetectMarketRegime(indexData *datapb.StockResponse) M
 	}
 
 	currentPrice := indexData.DataPoints[len(indexData.DataPoints)-1].Close
-	ma200 := utils.CalculateMovingAverage(indexData.DataPoints, 200)
+	ma200 := utils.CalculateMovingAverage(indexData.DataPoints, s.marketRegimePeriod)
 
 	if currentPrice > ma200 {
 		log.Infof("📈 Market regime: Bull, current price: %.2f, 200MA: %.2f", currentPrice, ma200)
@@ -127,10 +123,10 @@ func (s *MomentumStrategy) DetectMarketRegime(indexData *datapb.StockResponse) M
 
 func (s *MomentumStrategy) GetParameters() map[string]interface{} {
 	return map[string]interface{}{
-		"lookbackPeriod": s.lookbackPeriod,
-		"topPercentage":  s.topPercentage,
-		"riskFactor":     s.riskFactor,
-		"ma200Period":    s.ma200Period,
+		"lookbackPeriod":     s.lookbackPeriod,
+		"topPercentage":      s.topPercentage,
+		"riskFactor":         s.riskFactor,
+		"marketRegimePeriod": s.marketRegimePeriod,
 	}
 }
 
@@ -144,8 +140,8 @@ func (s *MomentumStrategy) SetParameters(params map[string]interface{}) error {
 	if riskFactor, ok := params["riskFactor"].(float64); ok {
 		s.riskFactor = riskFactor
 	}
-	if ma200Period, ok := params["ma200Period"].(int); ok {
-		s.ma200Period = ma200Period
+	if marketRegimePeriod, ok := params["marketRegimePeriod"].(int); ok {
+		s.marketRegimePeriod = marketRegimePeriod
 	}
 	return nil
 }

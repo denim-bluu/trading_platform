@@ -27,16 +27,16 @@ services:
     ports:
       - "5432:5432"
 
-  # strategy_service:
-  #   build:
-  #     context: ..
-  #     dockerfile: deployments/Dockerfile
-  #     args:
-  #       - SERVICE_NAME=strategy
-  #   ports:
-  #     - "50052:50052"
-  #   depends_on:
-  #     - data_service
+  strategy_service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      args:
+        - SERVICE_NAME=strategy
+    ports:
+      - "50052:50052"
+    depends_on:
+      - data_service
 
   # portfolio_service:
   #   build:

@@ -11,14 +11,15 @@ import (
 
 func (s *Server) GenerateSignals(ctx context.Context, req *pb.SignalRequest) (*pb.SignalResponse, error) {
 	s.Logger.WithFields(log.Fields{
-		"symbols":  req.Symbols,
-		"start":    req.StartDate,
-		"end":      req.EndDate,
-		"interval": req.Interval,
+		"symbols":     req.Symbols,
+		"start":       req.StartDate,
+		"end":         req.EndDate,
+		"interval":    req.Interval,
+		"marketIndex": req.MarketIndex,
 	}).Info("Generating signals")
 
 	// Fetch market index data (e.g., S&P 500)
-	indexResp, err := s.fetchIndexData(ctx, req.EndDate, req.StartDate, req.EndDate, req.Interval)
+	indexResp, err := s.fetchIndexData(ctx, req.MarketIndex, req.StartDate, req.EndDate, req.Interval)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch index data: %v", err)
 	}
@@ -66,13 +67,12 @@ func (s *Server) fetchBatchStockData(ctx context.Context, req *pb.SignalRequest)
 }
 
 func (s *Server) fetchIndexData(ctx context.Context, indexSymbol, startDate, endDate, interval string) (*datapb.StockResponse, error) {
-	s.Logger.Infof("📡 Fetching index data for S&P 500 from %v to %v", startDate, endDate)
+	s.Logger.Infof("📡 Fetching index data for %s from %v to %v", indexSymbol, startDate, endDate)
 	indexReq := &datapb.StockRequest{
 		Symbol:    indexSymbol,
 		StartDate: startDate,
 		EndDate:   endDate,
 		Interval:  interval,
 	}
-
 	return s.Clients.DataClient.GetStockData(ctx, indexReq)
 }
