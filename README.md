@@ -2,64 +2,147 @@
 
 ## Service Responsibilities
 
-1. ✅ Data Service:
+1. Data Service:
+   - Fetch and store historical and real-time market data
+   - Provide data to other services via API
+   - Calculate and store common technical indicators
+   - Manage data caching for improved performance
 
-   - Fetch historical stock data from external sources (e.g., Yahoo Finance API)
-      - Store the response into Postgres database for future retrieval
-      - Store the response into Cache (In-memory) for faster retrieval
-   - Provide both single stock and batch stock data retrieval
-   - Return OHLC (Open, High, Low, Close) price data, adjusted close prices, and volume
-   - Handle date range and interval specifications in requests
-
-2. ✅ Momentum Strategy Service:
-
-   - Calculate momentum scores using exponential regression and R-squared for 90-day periods
-   - Generate buy/hold signals based on momentum and price relative to 100-day moving average
-   - Calculate ATR (Average True Range) for position sizing
-   - Implement 15% gap check for the past 90 days
-   - Rank stocks based on momentum scores
-   - Filter to keep only the top 20% of stocks
-   - Calculate position sizes based on ATR for risk parity
-   - Provide a batch processing capability for multiple stocks
-   - Sort and return signals for the top-ranked stocks
+2. Strategy Service:
+   - Implement and manage multiple trading strategies
+   - Generate trading signals based on market data and configured strategies
+   - Provide risk calculations for potential trades
+   - Allow dynamic configuration of strategy parameters
 
 3. Portfolio Service:
-   - Manages the current portfolio composition
-   - Handles position sizing and risk management
-   - Performs weekly portfolio rebalancing
-   - Tracks performance and generates reports
+   - Receive signals from the Strategy Service
+   - Determine desired portfolio state based on signals and current market conditions
+   - Implement rebalancing logic and scheduling
+   - Generate trade orders to align actual portfolio with desired state
+   - Implement portfolio-level risk management rules
+   - Manage cash allocations within the portfolio
+   - Provide APIs for querying desired portfolio state and manually triggering rebalances
 
-4. TODO: Trade Execution Service:
-   - Interfaces with various brokers and exchanges
-   - Executes trades based on signals from the Portfolio Service
-   - Handles order management and trade confirmation
-   - Provides real-time trade status updates
+4. Trade Execution Service:
+   - Receive and execute trade orders from the Portfolio Service
+   - Interact with broker APIs or simulate trades in backtest mode
+   - Track status of submitted orders (pending, filled, partially filled, cancelled)
+   - Provide real-time updates on order status
+   - Implement smart order routing and execution algorithms
+   - Handle order types relevant to the trading strategies (e.g., market, limit, stop orders)
 
-5. TODO: Backtesting Service:
-   - Simulates trading strategies on historical data
-   - Generates performance reports and statistics
+5. Portfolio State Service:
+   - Maintain the actual, settled portfolio state
+   - Reconcile desired state (from Portfolio Service) with executed trades (from Trade Execution Service)
+   - Track actual positions, cash balance, and transaction history
+   - Calculate and store portfolio performance metrics
+   - Handle corporate actions (e.g., dividends, splits)
+   - Provide APIs for querying current portfolio state and historical performance
 
-6. TODO: API Gateway:
-   - Provides a unified entry point for external requests
-
-7. TODO: Scheduler Service:
-   - Manages the timing of various trading activities
-   - Triggers weekly trading actions (every Wednesday)
-   - Initiates bi-weekly position size rebalancing
-   - Schedules regular data updates and system maintenance tasks
+6. Backtesting Service:
+   - Coordinate with other services to simulate historical trading
+   - Fetch historical data from Data Service
+   - Generate historical signals using Strategy Service
+   - Simulate portfolio management using Portfolio Service
+   - Simulate trade execution using Trade Execution Service in backtest mode
+   - Track simulated portfolio state using Portfolio State Service
+   - Calculate and report backtesting performance metrics
+   - Provide tools for strategy optimization and parameter tunin  g
 
 ```mermaid
 graph TD
-    A[Scheduler Service] -->|Triggers weekly| B[Portfolio Service]
-    A -->|Triggers bi-weekly| B
-    B -->|Requests data| C[Data Service]
-    B -->|Requests signals| D[Strategy Service]
-    B -->|Sends trade orders| E[Trade Execution Service]
-    C -->|Provides market data| B
-    C -->|Provides market data| D
-    D -->|Provides signals| B
-    E -->|Executes trades| F[Broker/Exchange]
+    A[Data Service] --> B[Strategy Service]
+    A --> C[Portfolio Service]
+    A --> D[Trade Execution Service]
+    A --> E[Portfolio State Service]
+    A --> F[Backtesting Service]
+    B --> C
+    C --> D
+    D --> E
+    C -.-> E
+    F --> A
+    F --> B
+    F --> C
+    F --> D
+    F --> E
 ```
+
+## Example gRPC calls
+
+1. Data Service (assumed to be running on port 50051)
+
+   a. Get Stock Data:
+
+   ```sh
+   grpcurl -plaintext -d '{"symbol": "AAPL", "start_date": "2023-01-01", "end_date": "2023-06-01", "interval": "1d"}' localhost:50051 dataservice.DataService/GetStockData
+   ```
+
+   b. Get Batch Stock Data:
+
+   ```sh
+   grpcurl -plaintext -d '{"symbols": ["AAPL", "GOOGL"], "start_date": "2023-01-01", "end_date": "2023-06-01", "interval": "1d"}' localhost:50051 dataservice.DataService/GetBatchStockData
+   ```
+
+2. Strategy Service (assumed to be running on port 50052)
+
+   Generate Signals:
+
+   ```sh
+   grpcurl -plaintext -d '{"symbols": ["AAPL", "GOOGL", "MSFT", "AMZN", "TSLA", "NVDA", "NFLX", "PYPL", "ADBE", "INTC", "CSCO", "CMCSA", "PEP", "AVGO", "TXN", "COST", "QCOM", "TMUS", "AMGN", "SBUX", "INTU", "AMD", "ISRG", "GILD", "MDLZ", "BKNG", "MU", "ADP", "REGN", "ATVI"], "start_date": "2023-01-01", "end_date": "2023-06-01", "interval": "1d", "market_index": "^GSPC"}' localhost:50052 strategyservice.StrategyService/GenerateSignals
+   ```
+
+   Configure Strategy:
+
+   ```sh
+   grpcurl -plaintext -d '{"strategy_name": "momentum", "parameters": {"lookbackPeriod": "90", "topPercentage": "0.2", "riskFactor": "0.001"}}' localhost:50052 strategyservice.StrategyService/ConfigureStrategy
+   ```
+
+   Get Strategy Parameters:
+
+   ```sh
+   grpcurl -plaintext -d '{"strategy_name": "momentum"}' localhost:50052 strategyservice.StrategyService/GetStrategyParameters
+   ```
+
+3. Portfolio State Service
+
+   Get Portfolio State:
+
+   ```sh
+   grpcurl -plaintext localhost:50053 portfoliostateservice.PortfolioStateService/GetPortfolioState
+   ```
+
+   Update Portfolio State:
+
+   ```sh
+   grpcurl -plaintext -d '{"positions": [{"symbol": "AAPL", "quantity": 100, "current_price": 150.0, "market_value": 15000.0}], "cash_balance": 85000.0}' localhost:50053 portfoliostateservice.PortfolioStateService/UpdatePortfolioState
+   ```
+
+4. Portfolio Service
+
+   Generate Orders:
+
+   ```sh
+   grpcurl -plaintext -d '{"signals": [{"symbol": "AAPL", "signal": "BUY", "risk_unit": 0.1, "momentum_score": 0.5, "current_price": 150.0}]}' localhost:50054 portfolioservice.PortfolioService/GenerateOrders
+   ```
+
+   Get Desired Portfolio State:
+
+   ```sh
+   grpcurl -plaintext localhost:50054 portfolioservice.PortfolioService/GetDesiredPortfolioState
+   ```
+
+   Trigger Rebalance:
+
+   ```sh
+   grpcurl -plaintext localhost:50054 portfolioservice.PortfolioService/TriggerRebalance
+   ```
+
+   Update Rebalance Schedule:
+
+   ```sh
+   grpcurl -plaintext -d '{"schedule": "weekly"}' localhost:50054 portfolioservice.PortfolioService/UpdateRebalanceSchedule
+
+   ```
 
 ## Trading Process Summary
 

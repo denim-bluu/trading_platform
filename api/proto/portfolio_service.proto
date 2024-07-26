@@ -5,46 +5,62 @@ package portfolioservice;
 
 option go_package = "momentum-trading-platform/api/proto/portfolio_service";
 
+import "strategy_service.proto";
+
 service PortfolioService {
-  rpc WeeklyRebalance(RebalanceRequest) returns (PortfolioUpdate) {}
-  rpc BiWeeklyRebalance(RebalanceRequest) returns (PortfolioUpdate) {}
-  rpc GetPortfolioStatus(PortfolioStatusRequest) returns (PortfolioStatus) {}
+  rpc GenerateOrders(GenerateOrdersRequest) returns (GenerateOrdersResponse) {}
+  rpc GetDesiredPortfolioState(GetDesiredPortfolioStateRequest) returns (PortfolioState) {}
+  rpc TriggerRebalance(TriggerRebalanceRequest) returns (TriggerRebalanceResponse) {}
+  rpc UpdateRebalanceSchedule(UpdateRebalanceScheduleRequest) returns (UpdateRebalanceScheduleResponse) {}
 }
 
-message RebalanceRequest {
-  string date = 1;
+message GenerateOrdersRequest {
+  repeated strategyservice.StockSignal signals = 1;
 }
 
-message PortfolioUpdate {
-  repeated Trade trades = 1;
-  PortfolioStatus updated_status = 2;
+message GenerateOrdersResponse {
+  repeated Order orders = 1;
 }
 
-message Trade {
+message Order {
   string symbol = 1;
-  TradeType type = 2;
+  OrderType type = 2;
   int32 quantity = 3;
   double price = 4;
 }
 
-enum TradeType {
-  BUY = 0;
-  SELL = 1;
+enum OrderType {
+  MARKET = 0;
+  LIMIT = 1;
 }
 
-message PortfolioStatusRequest {}
+message GetDesiredPortfolioStateRequest {}
 
-message PortfolioStatus {
+message PortfolioState {
   repeated Position positions = 1;
   double cash_balance = 2;
   double total_value = 3;
-  string last_update_date = 4;
 }
 
 message Position {
   string symbol = 1;
   int32 quantity = 2;
-  double average_price = 3;
-  double current_price = 4;
-  double market_value = 5;
+  double current_price = 3;
+  double market_value = 4;
+}
+
+message TriggerRebalanceRequest {}
+
+message TriggerRebalanceResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message UpdateRebalanceScheduleRequest {
+  string schedule = 1;  // e.g., "weekly", "monthly", "daily"
+}
+
+message UpdateRebalanceScheduleResponse {
+  bool success = 1;
+  string message = 2;
 }

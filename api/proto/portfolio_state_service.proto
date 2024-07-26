@@ -1,0 +1,36 @@
+// api/proto/portfolio_state_service.proto
+syntax = "proto3";
+
+package portfoliostateservice;
+
+option go_package = "momentum-trading-platform/api/proto/portfolio_state_service";
+
+service PortfolioStateService {
+  rpc GetPortfolioState(GetPortfolioStateRequest) returns (PortfolioState) {}
+  rpc UpdatePortfolioState(UpdatePortfolioStateRequest) returns (UpdatePortfolioStateResponse) {}
+}
+
+message GetPortfolioStateRequest {}
+
+message PortfolioState {
+  repeated Position positions = 1;
+  double cash_balance = 2;
+  double total_value = 3;
+}
+
+message Position {
+  string symbol = 1;
+  int32 quantity = 2;
+  double current_price = 3;
+  double market_value = 4;
+}
+
+message UpdatePortfolioStateRequest {
+  repeated Position positions = 1;
+  double cash_balance = 2;
+}
+
+message UpdatePortfolioStateResponse {
+  bool success = 1;
+  string message = 2;
+}

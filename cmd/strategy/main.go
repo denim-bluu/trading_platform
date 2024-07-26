@@ -1,8 +1,9 @@
 package main
 
 import (
-	"log"
 	"net"
+
+	"github.com/charmbracelet/log"
 
 	"momentum-trading-platform/internal/strategy"
 
@@ -21,7 +22,7 @@ func main() {
 
 	s := strategy.NewServer(clients)
 
-	lis, err := net.Listen("tcp", ":50052")
+	lis, err := net.Listen("tcp", "0.0.0.0:50052")
 	if err != nil {
 		s.Logger.WithError(err).Fatal("Failed to listen")
 	}

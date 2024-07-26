@@ -1,3 +1,4 @@
+// internal/portfolio/rebalance.go
 package portfolio
 
 import (
@@ -5,166 +6,159 @@ import (
 	"fmt"
 	"time"
 
-	datapb "momentum-trading-platform/api/proto/data_service"
 	pb "momentum-trading-platform/api/proto/portfolio_service"
+	portfoliostatepb "momentum-trading-platform/api/proto/portfolio_state_service"
 	strategypb "momentum-trading-platform/api/proto/strategy_service"
-	"momentum-trading-platform/internal/utils"
 )
 
-// Weekly Rebalance (WeeklyRebalance method):
-//
-//   - Occurs every Wednesday
-//
-//   - Steps:
-//     a. Check if the S&P 500 index is in a positive trend (above 200-day MA)
-//     b. Get signals from the Strategy Service
-//     c. Sell positions: Sell any position not present in the current signals
-//     d. If index is in a positive trend, for each signal:
-//     d.1. If it's an existing position: Adjust the position size
-//     d.2. If it's a new position: Buy it (if cash is available)
-//     d.3. Update the portfolio status
-func (s *Server) WeeklyRebalance(ctx context.Context, req *pb.RebalanceRequest) (*pb.PortfolioUpdate, error) {
-	s.Logger.WithField("date", req.Date).Info("Performing weekly rebalance")
+func (s *Server) PerformRebalance(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	if !utils.IsWednesday(req.Date) {
-		// return nil, fmt.Errorf("weekly rebalance can only be performed on Wednesdays")
-	}
+	s.Logger.Info("Starting portfolio rebalance")
 
-	isIndexPositive, err := s.isIndexInPositiveTrend(ctx)
+	// Get latest signals
+	signals, err := s.getLatestSignals(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check index trend: %v", err)
+		return fmt.Errorf("failed to get latest signals: %w", err)
 	}
+	s.Logger.WithField("signalCount", len(signals)).Info("Received signals for rebalance")
 
-	signals, err := s.getStrategySignals(ctx)
+	// Generate orders based on signals
+	ordersResp, err := s.GenerateAndSubmitOrders(ctx, &pb.GenerateOrdersRequest{Signals: signals})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get strategy signals: %v", err)
+		return fmt.Errorf("failed to generate and submit orders: %w", err)
+	}
+	s.Logger.WithField("orderCount", len(ordersResp.Orders)).Info("Generated and submitted rebalance orders")
+
+	s.lastRebalanceTime = time.Now()
+	s.Logger.WithField("lastRebalanceTime", s.lastRebalanceTime).Info("Rebalance completed successfully")
+	return nil
+}
+
+func (s *Server) getLatestSignals(ctx context.Context) ([]*strategypb.StockSignal, error) {
+	s.Logger.Info("Fetching latest signals from Strategy Service")
+
+	// Assuming we want signals for all stocks in S&P 500
+	symbols := []string{"AAPL", "GOOGL", "MSFT"} // This should be expanded to include all relevant symbols
+
+	req := &strategypb.SignalRequest{
+		Symbols:   symbols,
+		StartDate: time.Now().AddDate(0, 0, -7).Format("2006-01-02"), // Last 7 days
+		EndDate:   time.Now().Format("2006-01-02"),
+		Interval:  "1d",
 	}
 
-	var trades []*pb.Trade
-
-	// Sell positions that are no longer in the signals
-	for symbol := range s.Portfolio {
-		if !s.isSymbolInSignals(symbol, signals.Signals) {
-			trade := s.sellPosition(symbol)
-			trades = append(trades, trade)
-		}
+	resp, err := s.Clients.StrategyClient.GenerateSignals(ctx, req)
+	if err != nil {
+		s.Logger.WithError(err).Error("Failed to fetch signals from Strategy Service")
+		return nil, fmt.Errorf("failed to fetch signals: %w", err)
 	}
 
-	// Buy new positions or adjust existing ones if index is in positive trend
-	if isIndexPositive {
-		for _, signal := range signals.Signals {
-			if position, exists := s.Portfolio[signal.Symbol]; exists {
-				trade := s.adjustPosition(signal, position)
-				if trade != nil {
-					trades = append(trades, trade)
-				}
-			} else if s.CashBalance > 0 {
-				trade := s.buyPosition(signal)
-				if trade != nil {
-					trades = append(trades, trade)
-				}
+	s.Logger.WithField("signalCount", len(resp.Signals)).Info("Received signals from Strategy Service")
+	return resp.Signals, nil
+}
+
+func (s *Server) generateRebalanceOrders() []*pb.Order {
+	s.Logger.Info("Generating rebalance orders")
+	var orders []*pb.Order
+
+	// Get current portfolio state from Portfolio State Service
+	currentPortfolio, err := s.getCurrentPortfolio(context.Background())
+	if err != nil {
+		s.Logger.WithError(err).Error("Failed to get current portfolio state")
+		return orders
+	}
+
+	for symbol, desiredPosition := range s.DesiredPortfolio {
+		currentPosition, exists := currentPortfolio[symbol]
+		if !exists {
+			// New position to open
+			orders = append(orders, &pb.Order{
+				Symbol:   symbol,
+				Type:     pb.OrderType_MARKET,
+				Quantity: desiredPosition.Quantity,
+			})
+		} else if desiredPosition.Quantity != currentPosition.Quantity {
+			// Existing position to adjust
+			orderQuantity := desiredPosition.Quantity - currentPosition.Quantity
+			orderType := pb.OrderType_MARKET
+			if orderQuantity > 0 {
+				orders = append(orders, &pb.Order{
+					Symbol:   symbol,
+					Type:     orderType,
+					Quantity: orderQuantity,
+				})
+			} else {
+				orders = append(orders, &pb.Order{
+					Symbol:   symbol,
+					Type:     orderType,
+					Quantity: -orderQuantity,
+				})
 			}
 		}
 	}
 
-	s.LastUpdateDate = req.Date
-
-	if err := s.Storage.SavePortfolioState(ctx, s.getPortfolioStatus(), true); err != nil {
-		s.Logger.WithError(err).Error("Failed to save portfolio state snapshot")
+	// Check for positions to close
+	for symbol, currentPosition := range currentPortfolio {
+		if _, exists := s.DesiredPortfolio[symbol]; !exists {
+			orders = append(orders, &pb.Order{
+				Symbol:   symbol,
+				Type:     pb.OrderType_MARKET,
+				Quantity: -currentPosition.Quantity,
+			})
+		}
 	}
 
-	return &pb.PortfolioUpdate{
-		Trades:        trades,
-		UpdatedStatus: s.getPortfolioStatus(),
+	return orders
+}
+
+func (s *Server) sendOrdersToExecution(ctx context.Context, orders []*pb.Order) error {
+	// Implementation to send orders to Trade Execution Service
+	// This will involve making a gRPC call to the Trade Execution Service
+	return nil
+}
+
+func (s *Server) getCurrentPortfolio(ctx context.Context) (map[string]*pb.Position, error) {
+	state, err := s.Clients.PortfolioStateClient.GetPortfolioState(ctx, &portfoliostatepb.GetPortfolioStateRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	currentPortfolio := make(map[string]*pb.Position)
+	for _, pos := range state.Positions {
+		currentPortfolio[pos.Symbol] = &pb.Position{
+			Symbol:       pos.Symbol,
+			Quantity:     pos.Quantity,
+			CurrentPrice: pos.CurrentPrice,
+			MarketValue:  pos.MarketValue,
+		}
+	}
+
+	return currentPortfolio, nil
+}
+
+func (s *Server) TriggerRebalance(ctx context.Context, req *pb.TriggerRebalanceRequest) (*pb.TriggerRebalanceResponse, error) {
+	err := s.PerformRebalance(ctx)
+	if err != nil {
+		return &pb.TriggerRebalanceResponse{
+			Success: false,
+			Message: "Failed to perform rebalance: " + err.Error(),
+		}, nil
+	}
+	return &pb.TriggerRebalanceResponse{
+		Success: true,
+		Message: "Rebalance performed successfully",
 	}, nil
 }
 
-// BiWeekly Rebalance:
-//
-//   - Occurs on the second Wednesday of each month
-//
-//   - Steps:
-//     a. Perform the regular weekly rebalance
-//     b. Get fresh signals from the strategy service
-//     c. For all current positions, adjust position sizes based on the new signals
-//     d. Update the portfolio status
-func (s *Server) BiWeeklyRebalance(ctx context.Context, req *pb.RebalanceRequest) (*pb.PortfolioUpdate, error) {
-	s.Logger.WithField("date", req.Date).Info("Performing bi-weekly rebalance")
+func (s *Server) UpdateRebalanceSchedule(ctx context.Context, req *pb.UpdateRebalanceScheduleRequest) (*pb.UpdateRebalanceScheduleResponse, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	if !utils.IsSecondWednesdayOfMonth(req.Date) {
-		// return nil, fmt.Errorf("bi-weekly rebalance can only be performed on the second Wednesday of the month")
-	}
-
-	// Perform the regular weekly rebalance
-	weeklyUpdate, err := s.WeeklyRebalance(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to perform weekly rebalance: %v", err)
-	}
-
-	// Then, adjust all position sizes
-	signals, err := s.getStrategySignals(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get strategy signals: %v", err)
-	}
-
-	var additionalTrades []*pb.Trade
-
-	for _, signal := range signals.Signals {
-		if position, exists := s.Portfolio[signal.Symbol]; exists {
-			trade := s.adjustPosition(signal, position)
-			if trade != nil {
-				additionalTrades = append(additionalTrades, trade)
-			}
-		}
-	}
-
-	weeklyUpdate.Trades = append(weeklyUpdate.Trades, additionalTrades...)
-	weeklyUpdate.UpdatedStatus = s.getPortfolioStatus()
-
-	if err := s.Storage.SavePortfolioState(ctx, s.getPortfolioStatus(), true); err != nil {
-		s.Logger.WithError(err).Error("Failed to save portfolio state snapshot")
-	}
-	return weeklyUpdate, nil
-}
-
-func (s *Server) isIndexInPositiveTrend(ctx context.Context) (bool, error) {
-	resp, err := s.Clients.DataClient.GetStockData(ctx, &datapb.StockRequest{
-		Symbol:    "^GSPC", // S&P 500 index
-		StartDate: time.Now().AddDate(0, 0, -200).Format("2006-01-02"),
-		EndDate:   time.Now().Format("2006-01-02"),
-		Interval:  "1d",
-	})
-	if err != nil {
-		return false, err
-	}
-
-	ma200 := utils.CalculateMovingAverage(resp.DataPoints, 200)
-	currentPrice := resp.DataPoints[len(resp.DataPoints)-1].Close
-	return currentPrice > ma200, nil
-}
-
-func (s *Server) getStrategySignals(ctx context.Context) (*strategypb.SignalResponse, error) {
-	return s.Clients.StrategyClient.GenerateSignals(ctx, &strategypb.SignalRequest{
-		Symbols:   s.getSymbolsToAnalyze(),
-		StartDate: time.Now().AddDate(0, 0, -90).Format("2006-01-02"),
-		EndDate:   time.Now().Format("2006-01-02"),
-		Interval:  "1d",
-	})
-}
-
-func (s *Server) getSymbolsToAnalyze() []string {
-	// This should return all symbols in the S&P 500 index
-	// Placeholder implementation
-	return []string{"AAPL", "GOOGL", "MSFT", "AMZN", "TSLA", "NVDA", "NFLX", "PYPL", "ADBE",
-		"INTC", "CSCO", "CMCSA", "PEP", "AVGO", "TXN", "COST", "QCOM", "TMUS", "AMGN", "SBUX",
-		"INTU", "AMD", "ISRG", "GILD", "MDLZ", "BKNG", "MU", "ADP", "REGN", "ATVI"}
-}
-
-func (s *Server) isSymbolInSignals(symbol string, signals []*strategypb.StockSignal) bool {
-	for _, signal := range signals {
-		if signal.Symbol == symbol {
-			return true
-		}
-	}
-	return false
+	s.RebalanceSchedule = req.Schedule
+	return &pb.UpdateRebalanceScheduleResponse{
+		Success: true,
+		Message: "Rebalance schedule updated successfully",
+	}, nil
 }
