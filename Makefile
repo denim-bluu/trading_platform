@@ -12,6 +12,10 @@ up:
 down:
 	docker-compose -f $(DOCKER_COMPOSE_FILE) down
 
+# Delete volumes and images
+destroy:
+	docker-compose -f $(DOCKER_COMPOSE_FILE) down -v --rmi all
+
 # Target to build the Docker Compose services
 build:
 	docker-compose -f $(DOCKER_COMPOSE_FILE) build

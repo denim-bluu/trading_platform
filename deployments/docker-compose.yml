@@ -1,4 +1,15 @@
 services:
+  postgres:
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=${DB_USER:-trading_platform}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-0000}
+      - POSTGRES_DB=${DB_NAME:-data}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
   data_service:
     build:
       context: ..
@@ -16,17 +27,6 @@ services:
     depends_on:
       - postgres
 
-  postgres:
-    image: postgres:13
-    environment:
-      - POSTGRES_USER=${DB_USER:-trading_platform}
-      - POSTGRES_PASSWORD=${DB_PASSWORD:-0000}
-      - POSTGRES_DB=${DB_NAME:-data}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-
   strategy_service:
     build:
       context: ..
@@ -38,40 +38,36 @@ services:
     depends_on:
       - data_service
 
-  # portfolio_service:
-  #   build:
-  #     context: ..
-  #     dockerfile: deployments/Dockerfile
-  #     args:
-  #       - SERVICE_NAME=portfolio
-  #   ports:
-  #     - "50053:50053"
-  #   depends_on:
-  #     - data_service
-  #     - strategy_service
+  portfolio_state_service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      args:
+        - SERVICE_NAME=portfolio_state
+    environment:
+      - DB_HOST=postgres
+      - DB_USER=trading_platform
+      - DB_PASSWORD=0000
+      - DB_NAME=data
+      - DB_PORT=5432
+    ports:
+      - "50053:50053"
+    depends_on:
+      - postgres
 
-  # trade_service:
-  #   build:
-  #     context: ..
-  #     dockerfile: deployments/Dockerfile
-  #     args:
-  #       - SERVICE_NAME=trade
-  #   ports:
-  #     - "50054:50054"
-  #   depends_on:
-  #     - portfolio_service
+  portfolio_service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      args:
+        - SERVICE_NAME=portfolio
+    ports:
+      - "50054:50054"
+    depends_on:
+      - portfolio_state_service
+      - data_service
+      - strategy_service
 
-  # backtesting_service:
-  #   build:
-  #     context: ..
-  #     dockerfile: deployments/Dockerfile
-  #     args:
-  #       - SERVICE_NAME=backtesting
-  #   ports:
-  #     - "50055:50055"
-  #   depends_on:
-  #     - data_service
-  #     - strategy_service
 volumes:
   postgres_data:
 

@@ -50,12 +50,9 @@ func GenerateSignal(momentumScore float64, price float64, movingAverage float64)
 	return stratpb.SignalType_HOLD
 }
 
-// CalculateRiskUnit calculates the position size based on ATR and account value
+// CalculateRiskUnit calculates the position size based on ATR and risk factor. This is later used to calculate the position size.
 func CalculateRiskUnit(atr, riskFactor float64) float64 {
 	return riskFactor / atr
-}
-func CalculatePositionSize(riskFactor, accountValue float64) int32 {
-	return int32(riskFactor * accountValue)
 }
 
 // CalculateATR calculates the Average True Range (ATR)
